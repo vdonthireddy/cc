@@ -1,0 +1,237 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int              @id @default(autoincrement())
+  email            String           @unique
+  role             String           // student|parent|counselor|admin
+  name             String
+  passwordHash     String?
+  student          Student?
+  parentLinks      StudentParent[]  @relation("ParentToStudent")
+  counselorStudents Student[]       @relation("CounselorStudents")
+  auditLogs        AuditLog[]
+  sessions         Session[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Session {
+  id        String   @id
+  userId    Int
+  expiresAt DateTime
+  user      User     @relation(references: [id], fields: [userId], onDelete: Cascade)
+}
+
+model Student {
+  id                Int              @id @default(autoincrement())
+  userId            Int              @unique
+  user              User             @relation(fields: [userId], references: [id])
+  grade             Int
+  zipCode           String
+  majorInterest     String?          // e.g., "CS", "Medicine"
+  counselorId       Int?
+  counselor         User?            @relation("CounselorStudents", fields: [counselorId], references: [id])
+  parents           StudentParent[]  @relation("StudentToParent")
+  shareWithParents  Boolean          @default(true) // FERPA toggle
+  
+  academics         AcademicRecord[]
+  extracurriculars  Extracurricular[]
+  applications      Application[]
+  documents         Document[]
+  recommendations   RecommendationRequest[]
+  visits            CollegeVisit[]
+  savedColleges     StudentCollege[]
+  scholarshipApplications ScholarshipApplication[]
+}
+
+model StudentParent {
+  studentId   Int
+  parentId    Int
+  student     Student @relation("StudentToParent", fields: [studentId], references: [id])
+  parent      User    @relation("ParentToStudent", fields: [parentId], references: [id])
+  permissions Json    @default("{\"viewGrades\":true,\"viewRoadmap\":true,\"comment\":false}")
+  
+  @@id([studentId, parentId])
+}
+
+model AcademicRecord {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  student     Student  @relation(fields: [studentId], references: [id])
+  courseName  String
+  grade       String?
+  credits     Float?
+  semester    String
+  year        Int
+  isAP        Boolean  @default(false)
+  isHonors    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Extracurricular {
+  id                Int      @id @default(autoincrement())
+  studentId         Int
+  student           Student  @relation(fields: [studentId], references: [id])
+  name              String
+  role              String?
+  impactDescription String?  @db.Text
+  hoursPerWeek      Int?
+  weeksPerYear      Int?
+  proofUrl          String?
+  startDate         DateTime?
+  endDate           DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model College {
+  id            Int      @id @default(autoincrement())
+  name          String
+  location      String?
+  sat25th       Int?
+  sat75th       Int?
+  act25th       Int?
+  act75th       Int?
+  acceptRate    Float?
+  applications  Application[]
+  visits        CollegeVisit[]
+  students      StudentCollege[]
+}
+
+model StudentCollege {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  collegeId Int
+  student   Student  @relation(fields: [studentId], references: [id])
+  college   College  @relation(fields: [collegeId], references: [id])
+  addedAt   DateTime @default(now())
+  demonstratedInterest Int @default(0)
+
+  @@unique([studentId, collegeId])
+}
+
+model Application {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  student     Student  @relation(fields: [studentId], references: [id])
+  collegeId   Int
+  college     College  @relation(fields: [collegeId], references: [id])
+  status      String   // interested|applied|accepted|rejected|waitlisted|enrolled
+  deadline    DateTime?
+  notes       String?  @db.Text
+}
+
+model Document {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  student     Student  @relation(fields: [studentId], references: [id])
+  name        String
+  type        String   // transcript|essay|other
+  url         String
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+}
+
+model RecommendationRequest {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  student     Student  @relation(fields: [studentId], references: [id])
+  teacherName String
+  teacherEmail String
+  status      String   // requested|sent|completed
+  deadline    DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Scholarship {
+  id          Int      @id @default(autoincrement())
+  name        String
+  amount      Int?
+  deadline    DateTime?
+  description String?  @db.Text
+  minGpa      Float?
+  requirements String? @db.Text
+  applications ScholarshipApplication[]
+}
+
+model ScholarshipApplication {
+  id            Int      @id @default(autoincrement())
+  studentId     Int
+  scholarshipId Int
+  student       Student  @relation(fields: [studentId], references: [id])
+  scholarship   Scholarship @relation(fields: [scholarshipId], references: [id])
+  status        String   // interested|applied|accepted|rejected
+  awardedAmount Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentId, scholarshipId])
+}
+
+model CollegeVisit {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  student     Student  @relation(fields: [studentId], references: [id])
+  collegeId   Int
+  college     College  @relation(fields: [collegeId], references: [id])
+  visitDate   DateTime
+  notes       String?  @db.Text
+}
+
+model SystemConfig {
+  id                  Int      @id @default(1)
+  openaiApiKey        String?  @db.Text // AES-256 encrypted
+  serperApiKey        String?  @db.Text // AES-256 encrypted
+  encryptionKey       String   // from env, not UI
+  agentConfig         Json     @default("{\"scout\":{\"enabled\":false,\"concurrency\":2},\"report\":{\"enabled\":false,\"concurrency\":1}}")
+  featureFlags        Json     @default("{\"scholarships\":true,\"interviewPrep\":false}")
+  dataRetentionMonths Int      @default(12)
+  updatedAt           DateTime @updatedAt
+  updatedBy           Int?
+}
+
+model AgentLog {
+  id          Int      @id @default(autoincrement())
+  agentName   String   // scout|report|guardian
+  studentId   Int?
+  status      String   // queued|running|success|error
+  input       Json?
+  output      Json?
+  error       String?  @db.Text
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  action      String   // "VIEW_GRADES", "UPDATE_API_KEY"
+  targetType  String   // "Student", "SystemConfig"
+  targetId    String?
+  metadata    Json?
+  ip          String?
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      String   // info|warning|error|success
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

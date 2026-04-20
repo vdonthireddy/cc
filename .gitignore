@@ -1,0 +1,43 @@
+# Secrets
+.env
+api/.env
+web/.env
+*.pem
+
+# Dependencies
+node_modules/
+api/node_modules/
+web/node_modules/
+
+# Build artifacts
+dist/
+api/dist/
+web/dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Database data
+mysqldata/
+redisdata/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Testing
+web/test-results/
+web/playwright-report/
+coverage/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
