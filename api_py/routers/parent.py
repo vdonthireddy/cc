@@ -5,42 +5,105 @@ from typing import Optional
 
 router = APIRouter()
 
-@router.get("/student")
-async def get_parent_student(current_user: dict = Depends(get_current_user)):
+@router.get("/students/")
+async def get_parent_students(current_user: dict = Depends(get_current_user)):
+    user_id = current_user["id"]
+    if current_user["role"].upper() not in ["PARENT", "ADMIN"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+        
+    students = execute_query("""
+        SELECT s.id, u.name
+        FROM Student s
+        JOIN User u ON s.userId = u.id
+        JOIN StudentParent sp ON s.id = sp.studentId
+        WHERE sp.parentId = %s
+    """, (user_id,))
+    return students
+
+def calculate_weighted_gpa(records):
+    grade_points = {
+        "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7,
+        "C+": 2.3, "C": 2.0, "C-": 1.7, "D+": 1.3, "D": 1.0, "F": 0.0
+    }
+    total_points = 0.0
+    total_credits = 0.0
+    for r in records:
+        base = grade_points.get(r["grade"] or "", 0.0)
+        weight = 1.0 if r.get("isAP") else (0.5 if r.get("isHonors") else 0.0)
+        credits = r.get("credits") or 1.0
+        total_points += (base + weight) * credits
+        total_credits += credits
+    return round(total_points / total_credits, 2) if total_credits > 0 else 0.0
+
+@router.get("/")
+async def get_student_detail(studentId: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     user_role = current_user["role"].upper()
     
     if user_role not in ["PARENT", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Forbidden")
         
-    # For demo, take the first student in the system
-    # In production, this would join on StudentParent table
-    student = execute_query("""
-        SELECT s.*, u.name, u.email
-        FROM Student s
-        JOIN User u ON s.userId = u.id
-        LIMIT 1
-    """, fetch_one=True)
+    # Verify ownership
+    if studentId:
+        link = execute_query("SELECT studentId FROM StudentParent WHERE studentId = %s AND parentId = %s", (studentId, user_id), fetch_one=True)
+        if not link and user_role != "ADMIN":
+            raise HTTPException(status_code=403, detail="Access denied")
+        target_id = studentId
+    else:
+        student = execute_query("SELECT studentId FROM StudentParent WHERE parentId = %s LIMIT 1", (user_id,), fetch_one=True)
+        if not student:
+            student = execute_query("SELECT id as studentId FROM Student LIMIT 1", fetch_one=True)
+        if not student:
+            raise HTTPException(status_code=404, detail="No student found")
+        target_id = student["studentId"]
+
+    student_data = execute_query("SELECT s.*, u.name, u.email FROM Student s JOIN User u ON s.userId = u.id WHERE s.id = %s", (target_id,), fetch_one=True)
     
-    if not student:
-        raise HTTPException(status_code=404, detail="No student found")
-        
-    # Fetch academics
-    academics = execute_query("""
-        SELECT semester, grade, courseName
-        FROM AcademicRecord
-        WHERE studentId = %s
-        ORDER BY year DESC, semester DESC
-    """, (student["id"],))
+    # 1. Academics for GPA Trend (Weighted)
+    raw_academics = execute_query("""
+        SELECT semester, year, grade, courseName, credits, isAP, isHonors
+        FROM AcademicRecord 
+        WHERE studentId = %s 
+        ORDER BY year ASC, CASE WHEN semester='Fall' THEN 1 WHEN semester='Spring' THEN 2 ELSE 3 END ASC
+    """, (target_id,))
+    
+    # Group by semester to show average GPA over time
+    semester_groups = {}
+    for r in raw_academics:
+        key = f"{r['semester']} {r['year']}"
+        if key not in semester_groups:
+            semester_groups[key] = []
+        semester_groups[key].append(r)
+    
+    trend = []
+    for key, group_records in semester_groups.items():
+        avg = calculate_weighted_gpa(group_records)
+        trend.append({"semester": key, "grade": avg})
+
+    # 2. Dynamic Deadlines
+    deadlines = execute_query("""
+        SELECT a.deadline as date, c.name as title 
+        FROM Application a
+        JOIN College c ON a.collegeId = c.id
+        WHERE a.studentId = %s AND a.deadline IS NOT NULL
+        ORDER BY a.deadline ASC
+    """, (target_id,))
+    
+    if not deadlines:
+        deadlines = [
+            {"date": "2024-11-01", "title": "Early Action Task"},
+            {"date": "2024-12-15", "title": "FAFSA Priority"}
+        ]
+
+    # 3. Dynamic Readiness Score (Consistent with academic.py)
+    current_gpa = calculate_weighted_gpa(raw_academics)
+    readiness = (current_gpa / 4.0 * 60) + (min(len(raw_academics), 10) * 4)
     
     return {
-        "id": student["id"],
-        "name": student["name"],
-        "email": student["email"],
-        "readinessScore": 82,
-        "academics": academics,
-        "deadlines": [
-            {"date": "2023-11-01", "title": "Stanford Early Decision"},
-            {"date": "2023-12-15", "title": "UC Application"}
-        ]
+        "id": student_data["id"],
+        "name": student_data["name"],
+        "email": student_data["email"],
+        "readinessScore": round(min(readiness, 100)),
+        "academics": trend,
+        "deadlines": deadlines
     }

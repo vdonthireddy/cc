@@ -11,6 +11,9 @@ async def get_roadmap(studentId: Optional[str] = None, current_user: dict = Depe
     user_role = current_user["role"].upper()
     
     target_student_id = None
+    major_interest = "Other"
+    current_grade = 9
+    
     if user_role == "STUDENT":
         student = execute_query("SELECT id, grade, majorInterest FROM Student WHERE userId = %s", (user_id,), fetch_one=True)
         if student:

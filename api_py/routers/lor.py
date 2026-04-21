@@ -13,7 +13,7 @@ class LORRequest(BaseModel):
     teacherEmail: str
     deadline: Optional[str] = None
 
-@router.post("/request")
+@router.post("/request/")
 async def request_lor(req: LORRequest, current_user: dict = Depends(get_current_user)):
     deadline_date = datetime.fromisoformat(req.deadline) if req.deadline else None
     query = """

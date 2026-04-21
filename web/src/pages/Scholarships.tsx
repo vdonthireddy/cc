@@ -20,7 +20,7 @@ const Scholarships: React.FC = () => {
   const { user } = useAuthStore();
 
   const { data: scholarships, isLoading } = useQuery(['scholarships'], async () => {
-    const response = await axios.get(`/api/scholarships?studentId=${user?.studentId || 1}`);
+    const response = await axios.get(`/api/scholarships/?studentId=${user?.studentId || 1}`);
     return response.data;
   });
 

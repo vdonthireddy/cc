@@ -4,7 +4,7 @@ import {
   Divider, CircularProgress, Alert, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, IconButton, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
-  Tooltip
+  Tooltip, Select, InputLabel, FormControl, OutlinedInput
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -13,6 +13,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import BlockIcon from '@mui/icons-material/Block';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import KeyIcon from '@mui/icons-material/Key';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { useNavigate } from 'react-router-dom';
 
 const AdminSettings: React.FC = () => {
@@ -20,16 +21,20 @@ const AdminSettings: React.FC = () => {
   const [openAddDialog, setOpenAddDialog] = React.useState(false);
   const [openAssignDialog, setOpenAssignDialog] = React.useState(false);
   const [openAddCounselorDialog, setOpenAddCounselorDialog] = React.useState(false);
+  const [openAddParentDialog, setOpenAddParentDialog] = React.useState(false);
   const [openResetDialog, setOpenResetDialog] = React.useState(false);
   
   const [selectedStudent, setSelectedStudent] = React.useState<any>(null);
   const [selectedCounselor, setSelectedCounselor] = React.useState<any>(null);
 
   const [formData, setFormData] = React.useState({
-    email: '', name: '', grade: 9, zipCode: '', majorInterest: '', counselorId: ''
+    email: '', name: '', grade: 9, zipCode: '', majorInterest: '', counselorId: '', parentId: ''
   });
   const [counselorFormData, setCounselorFormData] = React.useState({
     email: '', name: '', password: ''
+  });
+  const [parentFormData, setParentFormData] = React.useState({
+    email: '', name: '', password: '', studentIds: [] as number[]
   });
   const [resetPasswordData, setResetPasswordData] = React.useState({
     newPassword: ''
@@ -40,17 +45,17 @@ const AdminSettings: React.FC = () => {
 
   // Queries
   const { data: config, isLoading: configLoading, error: configError } = useQuery(['adminConfig'], async () => {
-    const res = await axios.get('/api/admin/config');
+    const res = await axios.get('/api/admin/config/');
     return res.data;
   });
 
   const { data: students, isLoading: studentsLoading, error: studentsError } = useQuery(['adminStudents'], async () => {
-    const res = await axios.get('/api/counselor/students');
+    const res = await axios.get('/api/counselor/students/');
     return res.data;
   });
 
   const { data: allCounselors } = useQuery(['adminCounselorsAll'], async () => {
-    const res = await axios.get('/api/admin/counselors');
+    const res = await axios.get('/api/admin/counselors/');
     return res.data;
   });
 
@@ -59,10 +64,15 @@ const AdminSettings: React.FC = () => {
     return res.data;
   });
 
+  const { data: parents } = useQuery(['adminParents'], async () => {
+    const res = await axios.get('/api/admin/parents/');
+    return res.data;
+  });
+
   // Mutations
   const configMutation = useMutation(
     async (newConfig: any) => {
-      const res = await axios.patch('/api/admin/config', newConfig);
+      const res = await axios.patch('/api/admin/config/', newConfig);
       return res.data;
     },
     { onSuccess: () => queryClient.invalidateQueries(['adminConfig']) }
@@ -71,10 +81,10 @@ const AdminSettings: React.FC = () => {
   const saveStudentMutation = useMutation(
     async (studentData: any) => {
       if (selectedStudent) {
-        const res = await axios.patch(`/api/admin/students/${selectedStudent.id}`, studentData);
+        const res = await axios.patch(`/api/admin/students/${selectedStudent.id}/`, studentData);
         return res.data;
       } else {
-        const res = await axios.post('/api/admin/students', studentData);
+        const res = await axios.post('/api/admin/students/', studentData);
         return res.data;
       }
     },
@@ -83,14 +93,14 @@ const AdminSettings: React.FC = () => {
         queryClient.invalidateQueries(['adminStudents']);
         setOpenAddDialog(false);
         setSelectedStudent(null);
-        setFormData({ email: '', name: '', grade: 9, zipCode: '', majorInterest: '', counselorId: '' });
+        setFormData({ email: '', name: '', grade: 9, zipCode: '', majorInterest: '', counselorId: '', parentId: '' });
       },
     }
   );
 
   const assignCounselorMutation = useMutation(
-    async ({ studentId, counselorId }: any) => {
-      const res = await axios.patch(`/api/admin/students/${studentId}`, { counselorId });
+    async ({ studentId, counselorId, parentId }: any) => {
+      const res = await axios.patch(`/api/admin/students/${studentId}/`, { counselorId, parentId });
       return res.data;
     },
     {
@@ -103,7 +113,7 @@ const AdminSettings: React.FC = () => {
 
   const addCounselorMutation = useMutation(
     async (newCounselor: any) => {
-      const res = await axios.post('/api/admin/counselors', newCounselor);
+      const res = await axios.post('/api/admin/counselors/', newCounselor);
       return res.data;
     },
     {
@@ -116,9 +126,23 @@ const AdminSettings: React.FC = () => {
     }
   );
 
+  const addParentMutation = useMutation(
+    async (newParent: any) => {
+      const res = await axios.post('/api/admin/parents/', newParent);
+      return res.data;
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['adminParents']);
+        setOpenAddParentDialog(false);
+        setParentFormData({ email: '', name: '', password: '', studentIds: [] });
+      },
+    }
+  );
+
   const resetPasswordMutation = useMutation(
     async ({ id, newPassword }: any) => {
-      const res = await axios.patch(`/api/admin/counselors/${id}/reset-password`, { newPassword });
+      const res = await axios.patch(`/api/admin/counselors/${id}/reset-password/`, { newPassword });
       return res.data;
     },
     {
@@ -132,7 +156,7 @@ const AdminSettings: React.FC = () => {
 
   const toggleCounselorMutation = useMutation(
     async (id: number) => {
-      const res = await axios.patch(`/api/admin/counselors/${id}/toggle-active`);
+      const res = await axios.patch(`/api/admin/counselors/${id}/toggle-active/`);
       return res.data;
     },
     {
@@ -144,8 +168,26 @@ const AdminSettings: React.FC = () => {
     }
   );
 
+  const toggleParentMutation = useMutation(
+    async (id: number) => {
+      const res = await axios.patch(`/api/admin/parents/${id}/toggle-active/`);
+      return res.data;
+    },
+    {
+      onSuccess: () => queryClient.invalidateQueries(['adminParents'])
+    }
+  );
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleStudentSelect = (event: any) => {
+    const { value } = event.target;
+    setParentFormData({
+      ...parentFormData,
+      studentIds: typeof value === 'string' ? value.split(',').map(Number) : value,
+    });
   };
 
   if (configLoading || studentsLoading) return (
@@ -169,6 +211,7 @@ const AdminSettings: React.FC = () => {
         <Tabs value={tabValue} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tab label="Students" />
           <Tab label="Counselors" />
+          <Tab label="Parents" />
           <Tab label="Agent Controls" />
           <Tab label="Feature Flags" />
         </Tabs>
@@ -202,7 +245,7 @@ const AdminSettings: React.FC = () => {
                             {student.counselorName}
                             <IconButton size="small" onClick={() => {
                               setSelectedStudent(student);
-                              setFormData({ ...formData, counselorId: student.counselorId || '' });
+                              setFormData({ ...formData, counselorId: student.counselorId || '', parentId: student.parentId || '' });
                               setOpenAssignDialog(true);
                             }}>
                               <EditIcon fontSize="small" />
@@ -212,13 +255,14 @@ const AdminSettings: React.FC = () => {
                         <TableCell>{student.gpa}</TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => window.location.href=`/roadmap?studentId=${student.id}`}>Roadmap</Button>
+                            <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => { window.location.href=`/roadmap?studentId=${student.id}`; }}>Roadmap</Button>
                             <Button size="small" variant="outlined" color="secondary" startIcon={<EditIcon />} onClick={() => {
                               setSelectedStudent(student);
                               setFormData({
                                 email: student.email, name: student.name, grade: student.grade,
                                 zipCode: student.zipCode || '', majorInterest: student.majorInterest || '',
-                                counselorId: student.counselorId || ''
+                                counselorId: student.counselorId || '',
+                                parentId: student.parentId || ''
                               });
                               setOpenAddDialog(true);
                             }}>Edit</Button>
@@ -294,8 +338,56 @@ const AdminSettings: React.FC = () => {
             </Box>
           )}
 
-          {/* Agent Controls Tab */}
+          {/* Parents Tab */}
           {tabValue === 2 && (
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Manage Parents</Typography>
+                <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => setOpenAddParentDialog(true)}>Add Parent</Button>
+              </Box>
+              <TableContainer>
+                <Table>
+                  <TableHead sx={{ bgcolor: 'info.main' }}>
+                    <TableRow>
+                      <TableCell sx={{ color: 'white' }}>Name</TableCell>
+                      <TableCell sx={{ color: 'white' }}>Email</TableCell>
+                      <TableCell sx={{ color: 'white' }}>Status</TableCell>
+                      <TableCell sx={{ color: 'white' }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Array.isArray(parents) && parents.map((p: any) => (
+                      <TableRow key={p.id}>
+                        <TableCell>{p.name}</TableCell>
+                        <TableCell>{p.email}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={p.isActive ? "Active" : "Inactive"} 
+                            color={p.isActive ? "success" : "default"}
+                            size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            color={p.isActive ? "error" : "success"}
+                            startIcon={p.isActive ? <BlockIcon /> : <CheckCircleIcon />}
+                            onClick={() => toggleParentMutation.mutate(p.id)}
+                          >
+                            {p.isActive ? "Inactivate" : "Activate"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+
+          {/* Agent Controls Tab */}
+          {tabValue === 3 && (
              <Box>
                 <Typography variant="h6" gutterBottom>Agent Controls</Typography>
                 <FormControlLabel
@@ -310,7 +402,7 @@ const AdminSettings: React.FC = () => {
           )}
 
           {/* Feature Flags Tab */}
-          {tabValue === 3 && (
+          {tabValue === 4 && (
             <Box>
               <Typography variant="h6" gutterBottom>Feature Flags</Typography>
               <FormControlLabel
@@ -340,6 +432,10 @@ const AdminSettings: React.FC = () => {
             <MenuItem value="">None</MenuItem>
             {Array.isArray(activeCounselors) && activeCounselors.map((c: any) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
           </TextField>
+          <TextField id="s-parent" fullWidth select label="Parent (Optional)" margin="normal" value={formData.parentId} onChange={(e) => setFormData({...formData, parentId: e.target.value})}>
+            <MenuItem value="">None</MenuItem>
+            {Array.isArray(parents) && parents.map((p: any) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+          </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setOpenAddDialog(false); setSelectedStudent(null); }}>Cancel</Button>
@@ -348,16 +444,20 @@ const AdminSettings: React.FC = () => {
       </Dialog>
 
       <Dialog open={openAssignDialog} onClose={() => setOpenAssignDialog(false)}>
-        <DialogTitle>Assign Counselor to {selectedStudent?.name}</DialogTitle>
+        <DialogTitle>Assign Roles for {selectedStudent?.name}</DialogTitle>
         <DialogContent>
           <TextField id="as-counselor" fullWidth select label="Counselor" margin="normal" value={formData.counselorId} onChange={(e) => setFormData({...formData, counselorId: e.target.value})}>
             <MenuItem value="">None</MenuItem>
             {Array.isArray(activeCounselors) && activeCounselors.map((c: any) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
           </TextField>
+          <TextField id="as-parent" fullWidth select label="Parent" margin="normal" value={formData.parentId} onChange={(e) => setFormData({...formData, parentId: e.target.value})}>
+            <MenuItem value="">None</MenuItem>
+            {Array.isArray(parents) && parents.map((p: any) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+          </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenAssignDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={() => assignCounselorMutation.mutate({ studentId: selectedStudent?.id, counselorId: formData.counselorId })}>Save</Button>
+          <Button variant="contained" onClick={() => assignCounselorMutation.mutate({ studentId: selectedStudent?.id, counselorId: formData.counselorId, parentId: formData.parentId })}>Save</Button>
         </DialogActions>
       </Dialog>
 
@@ -371,6 +471,45 @@ const AdminSettings: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setOpenAddCounselorDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={() => addCounselorMutation.mutate(counselorFormData)}>Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openAddParentDialog} onClose={() => setOpenAddParentDialog(false)}>
+        <DialogTitle>Add New Parent</DialogTitle>
+        <DialogContent>
+          <TextField id="p-name" fullWidth label="Name" margin="normal" value={parentFormData.name} onChange={(e) => setParentFormData({...parentFormData, name: e.target.value})} />
+          <TextField id="p-email" fullWidth label="Email" margin="normal" value={parentFormData.email} onChange={(e) => setParentFormData({...parentFormData, email: e.target.value})} />
+          <TextField id="p-password" fullWidth label="Password" type="password" margin="normal" value={parentFormData.password} onChange={(e) => setParentFormData({...parentFormData, password: e.target.value})} />
+          
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="p-students-label">Associated Students</InputLabel>
+            <Select
+              labelId="p-students-label"
+              id="p-students"
+              multiple
+              value={parentFormData.studentIds}
+              onChange={handleStudentSelect}
+              input={<OutlinedInput label="Associated Students" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => {
+                    const student = students.find((s: any) => s.id === value);
+                    return <Chip key={value} label={student?.name || value} size="small" />;
+                  })}
+                </Box>
+              )}
+            >
+              {Array.isArray(students) && students.map((s: any) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {s.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAddParentDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={() => addParentMutation.mutate(parentFormData)}>Add</Button>
         </DialogActions>
       </Dialog>
 

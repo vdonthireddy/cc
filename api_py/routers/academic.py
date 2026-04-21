@@ -32,10 +32,21 @@ def calculate_gpa(records):
     return round(total_points / total_credits, 2) if total_credits > 0 else 0.0
 
 async def get_target_student_id(user, requested_student_id):
-    if user["role"].upper() == "STUDENT":
+    role = user["role"].upper()
+    if role == "STUDENT":
         student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
         return student["id"] if student else None
-    if (user["role"].upper() in ["ADMIN", "COUNSELOR"]) and requested_student_id:
+    
+    if role == "PARENT":
+        # If studentId provided, verify it's their child
+        if requested_student_id:
+            link = execute_query("SELECT studentId FROM StudentParent WHERE studentId = %s AND parentId = %s", (requested_student_id, user["id"]), fetch_one=True)
+            return int(requested_student_id) if link else None
+        # Otherwise default to first child
+        student = execute_query("SELECT studentId FROM StudentParent WHERE parentId = %s LIMIT 1", (user["id"],), fetch_one=True)
+        return student["studentId"] if student else None
+
+    if (role in ["ADMIN", "COUNSELOR"]) and requested_student_id:
         return int(requested_student_id)
     return None
 
@@ -93,3 +104,42 @@ async def get_report_data(studentId: Optional[str] = None, current_user: dict = 
             "course": r["courseName"]
         })
     return trend
+
+@router.get("/readiness/")
+async def get_student_readiness(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    target_id = await get_target_student_id(current_user, studentId)
+    if not target_id:
+        raise HTTPException(status_code=400, detail="Student ID required")
+        
+    student = execute_query("SELECT grade FROM Student WHERE id = %s", (target_id,), fetch_one=True)
+    records = execute_query("SELECT grade, credits, isAP, isHonors FROM AcademicRecord WHERE studentId = %s", (target_id,))
+    current_gpa = calculate_gpa(records)
+    
+    # 1. Milestone Progress
+    grade = student["grade"]
+    milestones = []
+    if grade == 9:
+        milestones = [{"task": "Join 2 ECs", "status": "Done"}, {"task": "Course Selection", "status": "Todo"}]
+    elif grade == 10:
+        milestones = [{"task": "PSAT Prep", "status": "Done"}, {"task": "Summer Internships", "status": "Todo"}]
+    elif grade == 11:
+        milestones = [{"task": "SAT/ACT", "status": "Todo"}, {"task": "College List", "status": "Todo"}]
+    else:
+        milestones = [{"task": "Apply", "status": "Todo"}, {"task": "Scholarships", "status": "Todo"}]
+        
+    # 2. Benchmarks (Simulated target college data)
+    benchmarks = [
+        {"college": "Reach (Ivy)", "medianGpa": 3.9, "diff": round(current_gpa - 3.9, 2)},
+        {"college": "Match (State)", "medianGpa": 3.5, "diff": round(current_gpa - 3.5, 2)},
+        {"college": "Safety", "medianGpa": 3.0, "diff": round(current_gpa - 3.0, 2)}
+    ]
+    
+    # 3. Dynamic Readiness Score (Formula: GPA weight 60% + Course Load weight 40%)
+    readiness = (current_gpa / 4.0 * 60) + (min(len(records), 10) * 4)
+    
+    return {
+        "currentGpa": current_gpa,
+        "milestones": milestones,
+        "benchmarks": benchmarks,
+        "readinessScore": round(min(readiness, 100))
+    }

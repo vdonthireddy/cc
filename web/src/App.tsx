@@ -16,6 +16,7 @@ import DocumentVault from './pages/DocumentVault';
 import Scholarships from './pages/Scholarships';
 import LoRManager from './pages/LoRManager';
 import InterviewPrep from './pages/InterviewPrep';
+import Reports from './pages/Reports';
 
 import { CircularProgress, Box } from '@mui/material';
 
@@ -58,6 +59,14 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['STUDENT']}>
               <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute allowedRoles={['STUDENT', 'COUNSELOR', 'PARENT', 'ADMIN']}>
+              <Reports />
             </ProtectedRoute>
           }
         />

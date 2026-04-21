@@ -33,13 +33,13 @@ const LoRManager: React.FC = () => {
   });
 
   const { data: requests, isLoading } = useQuery(['lor-requests'], async () => {
-    const response = await axios.get(`/api/lor${user?.role === 'STUDENT' ? `?studentId=${user?.studentId || 1}` : ''}`);
+    const response = await axios.get(`/api/lor/${user?.role === 'STUDENT' ? `?studentId=${user?.studentId || 1}` : ''}`);
     return response.data;
   });
 
   const mutation = useMutation(
     async (newRequest: any) => {
-      const response = await axios.post('/api/lor/request', {
+      const response = await axios.post('/api/lor/request/', {
         ...newRequest,
         studentId: user?.studentId || 1,
       });

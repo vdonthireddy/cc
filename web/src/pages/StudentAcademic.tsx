@@ -40,21 +40,21 @@ const StudentAcademic = () => {
   });
 
   const { data: records, isLoading } = useQuery(['academics', studentIdParam], async () => {
-    const url = `/api/academic${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
+    const url = `/api/academic/${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
     console.log('[ACADEMIC] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;
   });
 
   const { data: gpaData } = useQuery(['gpa', studentIdParam], async () => {
-    const url = `/api/academic/gpa${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
+    const url = `/api/academic/gpa/${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
     console.log('[GPA] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;
   });
 
   const addMutation = useMutation((newRecord: any) => 
-    axios.post(`/api/academic`, { ...newRecord, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
+    axios.post(`/api/academic/`, { ...newRecord, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
     onSuccess: () => {
       queryClient.invalidateQueries(['academics', studentIdParam]);
       queryClient.invalidateQueries(['gpa', studentIdParam]);

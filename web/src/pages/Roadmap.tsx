@@ -29,7 +29,7 @@ const Roadmap: React.FC = () => {
   const { data: roadmap, isLoading, error } = useQuery<RoadmapYear[]>({
     queryKey: ['roadmap', studentId],
     queryFn: async () => {
-      const response = await axios.get(`/api/roadmap${studentId ? `?studentId=${studentId}` : ''}`);
+      const response = await axios.get(`/api/roadmap/${studentId ? `?studentId=${studentId}` : ''}`);
       return response.data;
     },
   });

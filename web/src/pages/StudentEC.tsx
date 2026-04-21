@@ -35,14 +35,14 @@ const StudentEC = () => {
   });
 
   const { data: ecs } = useQuery(['ecs', studentIdParam], async () => {
-    const url = `/api/ec${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
+    const url = `/api/ec/${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
     console.log('[EC] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;
   });
 
   const addMutation = useMutation((newEC: any) => 
-    axios.post(`/api/ec`, { ...newEC, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
+    axios.post(`/api/ec/`, { ...newEC, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
     onSuccess: () => {
       queryClient.invalidateQueries(['ecs', studentIdParam]);
       setOpen(false);
@@ -50,7 +50,7 @@ const StudentEC = () => {
   });
 
   const deleteMutation = useMutation((id: number) => 
-    axios.delete(`/api/ec/${id}`), {
+    axios.delete(`/api/ec/${id}/`), {
     onSuccess: () => {
       queryClient.invalidateQueries(['ecs', studentIdParam]);
     }

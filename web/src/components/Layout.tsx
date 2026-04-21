@@ -31,6 +31,7 @@ import {
   EmojiEvents as ScholarshipIcon,
   AssignmentInd as LoRIcon,
   QuestionAnswer as InterviewIcon,
+  Assessment as ReportsIcon
 } from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore, ThemeType } from '../store/themeStore';
@@ -60,11 +61,12 @@ const Layout: React.FC = () => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', roles: ['STUDENT'] },
-    { text: 'Scholarships', icon: <ScholarshipIcon />, path: '/scholarships', roles: ['STUDENT'] },
-    { text: 'LoR Manager', icon: <LoRIcon />, path: '/lor', roles: ['STUDENT', 'COUNSELOR'] },
-    { text: 'Interview Prep', icon: <InterviewIcon />, path: '/interview-prep', roles: ['STUDENT'] },
-    { text: 'Academic', icon: <TimelineIcon />, path: '/roadmap', roles: ['STUDENT'] },
-    { text: 'Vault', icon: <FolderIcon />, path: '/vault', roles: ['STUDENT'] },
+    { text: 'Reports', icon: <ReportsIcon />, path: '/reports', roles: ['STUDENT', 'COUNSELOR', 'PARENT', 'ADMIN'] },
+    { text: 'Scholarships', icon: <ScholarshipIcon />, path: '/scholarships', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
+    { text: 'LoR Manager', icon: <LoRIcon />, path: '/lor', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
+    { text: 'Interview Prep', icon: <InterviewIcon />, path: '/interview-prep', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
+    { text: 'Academic', icon: <TimelineIcon />, path: '/roadmap', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
+    { text: 'Vault', icon: <FolderIcon />, path: '/vault', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
     { text: 'Parent Dashboard', icon: <ParentIcon />, path: '/parent', roles: ['PARENT'] },
     { text: 'Counselor Dashboard', icon: <SchoolIcon />, path: '/counselor', roles: ['COUNSELOR'] },
     { text: 'Admin Settings', icon: <SettingsIcon />, path: '/admin/settings', roles: ['ADMIN'] },

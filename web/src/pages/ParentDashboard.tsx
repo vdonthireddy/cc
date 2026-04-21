@@ -1,35 +1,51 @@
 import React from 'react';
-import { Container, Typography, Grid, Paper, Box } from '@mui/material';
+import { Container, Typography, Grid, Paper, Box, CircularProgress, MenuItem, TextField } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { VegaEmbed } from 'react-vega';
 
 const ParentDashboard: React.FC = () => {
-  // Fetch the student data associated with this parent
-  const { data: studentData, isLoading } = useQuery({
-    queryKey: ['parent-student-data'],
-    queryFn: async () => {
-      const response = await axios.get('/api/parent/student');
-      return response.data;
-    },
+  const [selectedStudentId, setSelectedStudentId] = React.useState<number | string>('');
+
+  // Fetch all students associated with this parent
+  const { data: students } = useQuery(['parent-students'], async () => {
+    const res = await axios.get('/api/parent/students/');
+    return res.data;
   });
 
-  if (isLoading) return <Typography>Loading student data...</Typography>;
-  if (!studentData) return <Typography>No student data found or permission denied.</Typography>;
+  // Fetch data for the selected student
+  const { data: studentData, isLoading } = useQuery(
+    ['parent-student-detail', selectedStudentId],
+    async () => {
+      const url = selectedStudentId ? `/api/parent/?studentId=${selectedStudentId}` : '/api/parent/';
+      const response = await axios.get(url);
+      console.log('[PARENT DASHBOARD] Student Detail:', response.data);
+      return response.data;
+    }
+  );
+
+  React.useEffect(() => {
+    if (students && students.length > 0 && !selectedStudentId) {
+      setSelectedStudentId(students[0].id);
+    }
+  }, [students, selectedStudentId]);
+
+  if (isLoading && !studentData) return <CircularProgress />;
+  if (!studentData) return <Typography>No student data found.</Typography>;
 
   const gpaSpec: any = {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
     description: 'GPA Trend',
-    width: 'container',
+    width: 600,
     height: 200,
-    data: { values: Array.isArray(studentData?.academics) ? studentData.academics : [] },
-    mark: 'line',
+    data: { values: JSON.parse(JSON.stringify(studentData?.academics || [])) },
+    mark: { type: 'line', point: true },
     encoding: {
-      x: { field: 'semester', type: 'ordinal', title: 'Semester' },
+      x: { field: 'semester', type: 'ordinal', title: 'Semester', sort: null },
       y: { field: 'grade', type: 'quantitative', title: 'GPA', scale: { domain: [0, 4.5] } },
       tooltip: [
-        { field: 'courseName', type: 'nominal' },
-        { field: 'grade', type: 'quantitative' }
+        { field: 'semester', type: 'ordinal' },
+        { field: 'grade', type: 'quantitative', title: 'GPA' }
       ]
     },
   };
@@ -37,9 +53,9 @@ const ParentDashboard: React.FC = () => {
   const deadlineSpec: any = {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
     description: 'Upcoming Deadlines',
-    width: 'container',
+    width: 800,
     height: 150,
-    data: { values: Array.isArray(studentData?.deadlines) ? studentData.deadlines : [] },
+    data: { values: JSON.parse(JSON.stringify(studentData?.deadlines || [])) },
     mark: 'bar',
     encoding: {
       x: { field: 'date', type: 'temporal', title: 'Deadline' },
@@ -50,15 +66,32 @@ const ParentDashboard: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom color="primary">
-        Parent Dashboard: {studentData.name}'s Progress
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
+          Parent Portal: {studentData.name}
+        </Typography>
+        
+        {Array.isArray(students) && students.length > 1 && (
+          <TextField
+            select
+            label="Switch Child"
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            sx={{ width: 200 }}
+          >
+            {students.map((s: any) => (
+              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+            ))}
+          </TextField>
+        )}
+      </Box>
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" gutterBottom>Academic Progress (GPA Trend)</Typography>
             <Box sx={{ width: '100%', height: 250 }}>
-              <VegaEmbed spec={gpaSpec} options={{ actions: false }} />
+              <VegaEmbed key={`gpa-${selectedStudentId}-${studentData?.academics?.length}`} spec={gpaSpec} options={{ actions: false }} />
             </Box>
           </Paper>
         </Grid>
@@ -76,7 +109,7 @@ const ParentDashboard: React.FC = () => {
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Upcoming Deadlines</Typography>
             <Box sx={{ width: '100%', height: 200 }}>
-              <VegaEmbed spec={deadlineSpec} options={{ actions: false }} />
+              <VegaEmbed key={`deadlines-${selectedStudentId}-${studentData?.deadlines?.length}`} spec={deadlineSpec} options={{ actions: false }} />
             </Box>
           </Paper>
         </Grid>

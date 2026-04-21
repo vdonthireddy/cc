@@ -68,8 +68,8 @@ if [ "$IS_DEMO" = true ]; then
   docker exec -i pathfinder-db mysql -u root -ppathfinder $DB_NAME < schema.sql
   
   # Seed the data
-  echo "Seeding data from demo/seed.sql..."
-  docker exec -i pathfinder-db mysql -u root -ppathfinder $DB_NAME < demo/seed.sql
+  echo "Seeding data from demo/seed_large.sql..."
+  docker exec -i pathfinder-db mysql -u root -ppathfinder $DB_NAME < demo/seed_large.sql
   echo "Demo setup complete."
 fi
 

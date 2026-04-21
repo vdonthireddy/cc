@@ -35,12 +35,12 @@ const CounselorDashboard: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = React.useState<any>(null);
 
   const { data: students, isLoading: studentsLoading, error: studentsError } = useQuery(['counselorStudents'], async () => {
-    const res = await axios.get('/api/counselor/students');
+    const res = await axios.get('/api/counselor/students/');
     return res.data;
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery(['counselorStats'], async () => {
-    const res = await axios.get('/api/counselor/stats');
+    const res = await axios.get('/api/counselor/stats/');
     return res.data;
   });
 
@@ -48,7 +48,7 @@ const CounselorDashboard: React.FC = () => {
     ['reportData', selectedStudent?.id],
     async () => {
       if (!selectedStudent) return null;
-      const res = await axios.get(`/api/academic/report-data?studentId=${selectedStudent.id}`);
+      const res = await axios.get(`/api/academic/report-data/?studentId=${selectedStudent.id}`);
       return res.data;
     },
     { enabled: !!selectedStudent && reportOpen }
