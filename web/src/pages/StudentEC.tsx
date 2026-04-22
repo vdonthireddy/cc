@@ -35,7 +35,9 @@ const StudentEC = () => {
     return params.get('studentId');
   }, [location.search]);
 
-  const isStaffView = !!studentIdParam && (user?.role === 'COUNSELOR' || user?.role === 'ADMIN');
+  const userRole = user?.role?.toUpperCase();
+  const isStaffView = !!studentIdParam && (userRole === 'COUNSELOR' || userRole === 'ADMIN');
+  const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
 
   const [open, setOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -47,6 +49,8 @@ const StudentEC = () => {
     weeksPerYear: 0
   });
 
+  const queryEnabled = !isStaff || !!studentIdParam;
+
   const { data: ecs, isLoading, error } = useQuery({
     queryKey: ['ecs', studentIdParam],
     queryFn: async () => {
@@ -54,6 +58,7 @@ const StudentEC = () => {
         const res = await axios.get(url);
         return res.data;
     },
+    enabled: queryEnabled,
     retry: false
   });
 
@@ -96,9 +101,9 @@ const StudentEC = () => {
     return Array.isArray(ecs) ? ecs.reduce((acc, curr) => acc + (curr.hoursPerWeek * curr.weeksPerYear), 0) : 0;
   }, [ecs]);
 
-  if (isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress size={60} /></Box>;
+  if (queryEnabled && isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress size={60} /></Box>;
 
-  if (error) return <Box p={3}><Alert severity="error">Failed to load extracurricular activities.</Alert></Box>;
+  if (queryEnabled && error) return <Box p={3}><Alert severity="error">Failed to load extracurricular activities.</Alert></Box>;
 
   return (
     <Box p={3} sx={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -128,91 +133,100 @@ const StudentEC = () => {
             startIcon={<AddIcon />} 
             onClick={() => setOpen(true)}
             sx={{ boxShadow: 2 }}
+            disabled={!queryEnabled}
           >
             Add Activity
           </Button>
         </Box>
       </Box>
 
-      {/* Summary Stats */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, bgcolor: 'primary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
-            <StarIcon />
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{Array.isArray(ecs) ? ecs.length : 0}</Typography>
-              <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Total Activities</Typography>
-            </Box>
+      {!queryEnabled ? (
+          <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
+              <Typography color="text.secondary">Please select a student from the dashboard or roadmap to manage their activities.</Typography>
           </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, bgcolor: 'secondary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
-            <TimerIcon />
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{totalHours}</Typography>
-              <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Total Annual Hours</Typography>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, bgcolor: 'info.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
-            <EventAvailableIcon />
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                {Array.isArray(ecs) ? Math.round(ecs.reduce((acc, curr) => acc + curr.weeksPerYear, 0) / (ecs.length || 1)) : 0}
-              </Typography>
-              <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Avg Weeks/Activity</Typography>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
+      ) : (
+          <>
+            {/* Summary Stats */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12} md={4}>
+                <Paper sx={{ p: 2, bgcolor: 'primary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
+                    <StarIcon />
+                    <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{Array.isArray(ecs) ? ecs.length : 0}</Typography>
+                    <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Total Activities</Typography>
+                    </Box>
+                </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                <Paper sx={{ p: 2, bgcolor: 'secondary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
+                    <TimerIcon />
+                    <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{totalHours}</Typography>
+                    <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Total Annual Hours</Typography>
+                    </Box>
+                </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                <Paper sx={{ p: 2, bgcolor: 'info.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
+                    <EventAvailableIcon />
+                    <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                        {Array.isArray(ecs) ? Math.round(ecs.reduce((acc, curr) => acc + curr.weeksPerYear, 0) / (ecs.length || 1)) : 0}
+                    </Typography>
+                    <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Avg Weeks/Activity</Typography>
+                    </Box>
+                </Paper>
+                </Grid>
+            </Grid>
 
-      <Divider sx={{ mb: 4 }} />
+            <Divider sx={{ mb: 4 }} />
 
-      <Grid container spacing={3}>
-        {Array.isArray(ecs) && ecs.length > 0 ? ecs.map((ec: ECRecord) => (
-          <Grid item xs={12} md={6} lg={4} key={ec.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>{ec.name}</Typography>
-                  <Chip size="small" label={`${ec.hoursPerWeek}h/wk`} color="primary" variant="outlined" />
-                </Box>
-                <Typography variant="subtitle2" color="secondary" sx={{ mb: 2, fontWeight: 'medium' }}>
-                  {ec.role || 'Participant'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ 
-                  display: '-webkit-box',
-                  WebkitLineClamp: 4,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
-                  {ec.impactDescription || 'No description provided.'}
-                </Typography>
-              </CardContent>
-              <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="caption" color="text.disabled">
-                  {ec.weeksPerYear} weeks per year
-                </Typography>
-                <Tooltip title="Delete Activity">
-                  <IconButton onClick={() => deleteMutation.mutate(ec.id)} color="error" size="small" disabled={deleteMutation.isLoading}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Card>
-          </Grid>
-        )) : (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 8, textAlign: 'center', border: '2px dashed #e0e0e0', bgcolor: 'transparent' }}>
-              <HistoryEduIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary">No activities logged yet.</Typography>
-              <Typography variant="body2" color="text.disabled" mb={3}>Start building your extracurricular profile today!</Typography>
-              <Button variant="outlined" onClick={() => setOpen(true)}>Add Your First Activity</Button>
-            </Paper>
-          </Grid>
-        )}
-      </Grid>
+            <Grid container spacing={3}>
+                {Array.isArray(ecs) && ecs.length > 0 ? ecs.map((ec: ECRecord) => (
+                <Grid item xs={12} md={6} lg={4} key={ec.id}>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>{ec.name}</Typography>
+                        <Chip size="small" label={`${ec.hoursPerWeek}h/wk`} color="primary" variant="outlined" />
+                        </Box>
+                        <Typography variant="subtitle2" color="secondary" sx={{ mb: 2, fontWeight: 'medium' }}>
+                        {ec.role || 'Participant'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ 
+                        display: '-webkit-box',
+                        WebkitLineClamp: 4,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                        }}>
+                        {ec.impactDescription || 'No description provided.'}
+                        </Typography>
+                    </CardContent>
+                    <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.disabled">
+                        {ec.weeksPerYear} weeks per year
+                        </Typography>
+                        <Tooltip title="Delete Activity">
+                        <IconButton onClick={() => deleteMutation.mutate(ec.id)} color="error" size="small" disabled={deleteMutation.isLoading}>
+                            <DeleteIcon />
+                        </IconButton>
+                        </Tooltip>
+                    </Box>
+                    </Card>
+                </Grid>
+                )) : (
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 8, textAlign: 'center', border: '2px dashed #e0e0e0', bgcolor: 'transparent' }}>
+                    <HistoryEduIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">No activities logged yet.</Typography>
+                    <Typography variant="body2" color="text.disabled" mb={3}>Start building your extracurricular profile today!</Typography>
+                    <Button variant="outlined" onClick={() => setOpen(true)}>Add Your First Activity</Button>
+                    </Paper>
+                </Grid>
+                )}
+            </Grid>
+          </>
+      )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold' }}>Add New Extracurricular Activity</DialogTitle>

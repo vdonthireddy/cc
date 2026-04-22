@@ -61,6 +61,8 @@ const LoRManager: React.FC = () => {
     retry: false
   });
 
+  const queryEnabled = !isStaff || !!studentIdParam;
+
   const { data: requests, isLoading, error } = useQuery({
     queryKey: ['lor-requests', studentIdParam],
     queryFn: async () => {
@@ -68,6 +70,7 @@ const LoRManager: React.FC = () => {
         const response = await axios.get(url);
         return response.data;
     },
+    enabled: queryEnabled,
     retry: false
   });
 
@@ -102,7 +105,7 @@ const LoRManager: React.FC = () => {
     }
   };
 
-  if (isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress /></Box>;
+  if (queryEnabled && isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress size={60} /></Box>;
 
   return (
     <Box p={3}>
@@ -110,7 +113,7 @@ const LoRManager: React.FC = () => {
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
           LoR Manager
         </Typography>
-        <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
+        <Button variant="contained" color="primary" onClick={() => setOpen(true)} disabled={!queryEnabled}>
           New Request
         </Button>
       </Box>
@@ -139,41 +142,49 @@ const LoRManager: React.FC = () => {
         </Paper>
       )}
 
-      {error ? (
-        <Alert severity="error" sx={{ mb: 3 }}>Failed to load LoR requests.</Alert>
+      {!queryEnabled ? (
+          <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
+              <Typography color="text.secondary">Please select a student from the dashboard or roadmap to manage their recommendations.</Typography>
+          </Paper>
       ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
-            <Table>
-            <TableHead sx={{ bgcolor: '#f8f9fa' }}>
-                <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Teacher</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Subject</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Last Updated</TableCell>
-                </TableRow>
-            </TableHead>
-            <TableBody>
-                {Array.isArray(requests) && requests.length > 0 ? (
-                requests.map((req: any) => (
-                    <TableRow key={req.id} hover>
-                    <TableCell sx={{ fontWeight: 'medium' }}>{req.teacherName}</TableCell>
-                    <TableCell>{req.subject}</TableCell>
-                    <TableCell>
-                        <Chip label={req.status} color={getStatusColor(req.status)} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell>{req.updatedAt ? new Date(req.updatedAt).toLocaleDateString() : 'Recently'}</TableCell>
-                    </TableRow>
-                ))
-                ) : (
-                <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
-                        <Typography color="text.secondary">No LoR requests found for this selection.</Typography>
-                    </TableCell>
-                </TableRow>
-                )}
-            </TableBody>
-            </Table>
-        </TableContainer>
+          <>
+            {error ? (
+                <Alert severity="error" sx={{ mb: 3 }}>Failed to load LoR requests.</Alert>
+            ) : (
+                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+                    <Table>
+                    <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+                        <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Teacher</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Subject</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Last Updated</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {Array.isArray(requests) && requests.length > 0 ? (
+                        requests.map((req: any) => (
+                            <TableRow key={req.id} hover>
+                            <TableCell sx={{ fontWeight: 'medium' }}>{req.teacherName}</TableCell>
+                            <TableCell>{req.subject}</TableCell>
+                            <TableCell>
+                                <Chip label={req.status} color={getStatusColor(req.status)} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell>{req.updatedAt ? new Date(req.updatedAt).toLocaleDateString() : 'Recently'}</TableCell>
+                            </TableRow>
+                        ))
+                        ) : (
+                        <TableRow>
+                            <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                                <Typography color="text.secondary">No LoR requests found for this selection.</Typography>
+                            </TableCell>
+                        </TableRow>
+                        )}
+                    </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+          </>
       )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>

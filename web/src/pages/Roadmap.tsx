@@ -52,15 +52,15 @@ const Roadmap: React.FC = () => {
     retry: false
   });
 
+  const queryEnabled = !isStaff || !!studentId;
   const { data: roadmap, isLoading, error } = useQuery<RoadmapYear[]>({
     queryKey: ['roadmap', studentId],
     queryFn: async () => {
-      if (isStaff && !studentId) return [];
       const url = studentId ? `/api/roadmap/?studentId=${studentId}` : '/api/roadmap/';
       const response = await axios.get(url);
       return response.data;
     },
-    enabled: !isStaff || !!studentId,
+    enabled: queryEnabled,
     retry: false
   });
 
@@ -73,9 +73,10 @@ const Roadmap: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  // Only show loading if the query is actually enabled and loading
+  if (isLoading && queryEnabled) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" p={10}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 10 }}>
         <CircularProgress size={60} />
         <Typography sx={{ mt: 2 }} color="text.secondary">Loading roadmap...</Typography>
       </Box>

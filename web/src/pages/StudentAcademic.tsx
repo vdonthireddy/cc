@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useAuthStore } from '../store/authStore';
 
 interface AcademicRecord {
   id: number;
@@ -23,11 +24,15 @@ interface AcademicRecord {
 const StudentAcademic = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const { user } = useAuthStore();
   
   const studentIdParam = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get('studentId');
   }, [location.search]);
+
+  const userRole = user?.role?.toUpperCase();
+  const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
 
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,6 +45,8 @@ const StudentAcademic = () => {
     isHonors: false
   });
 
+  const queryEnabled = !isStaff || !!studentIdParam;
+
   const { data: records, isLoading: recordsLoading, error: recordsError } = useQuery({
     queryKey: ['academics', studentIdParam],
     queryFn: async () => {
@@ -47,6 +54,7 @@ const StudentAcademic = () => {
       const res = await axios.get(url);
       return res.data;
     },
+    enabled: queryEnabled,
     retry: false
   });
 
@@ -57,6 +65,7 @@ const StudentAcademic = () => {
       const res = await axios.get(url);
       return res.data;
     },
+    enabled: queryEnabled,
     retry: false
   });
 
@@ -93,7 +102,7 @@ const StudentAcademic = () => {
     addMutation.mutate(formData);
   };
 
-  if (recordsLoading || gpaLoading) {
+  if (queryEnabled && (recordsLoading || gpaLoading)) {
     return (
       <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" p={10}>
         <CircularProgress size={60} thickness={4} />
@@ -102,7 +111,7 @@ const StudentAcademic = () => {
     );
   }
 
-  if (recordsError || gpaError) {
+  if (queryEnabled && (recordsError || gpaError)) {
     return (
       <Box p={3}>
         <Alert severity="error">
@@ -117,70 +126,78 @@ const StudentAcademic = () => {
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
         Academic Tracker {studentIdParam ? `(Student ID: ${studentIdParam})` : ''}
       </Typography>
-      
-      <Grid container spacing={3} mb={3}>
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.main', color: 'white', borderRadius: 2, boxShadow: 4 }}>
-            <Typography variant="h6" sx={{ opacity: 0.9 }}>Current Weighted GPA</Typography>
-            <Typography variant="h2" sx={{ fontWeight: 'bold' }}>
-                {gpaData?.currentGPA ? Number(gpaData.currentGPA).toFixed(2) : '0.00'}
-            </Typography>
+
+      {!queryEnabled ? (
+          <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
+              <Typography color="text.secondary">Please select a student from the dashboard or roadmap to manage their academic records.</Typography>
           </Paper>
-        </Grid>
-      </Grid>
+      ) : (
+          <>
+            <Grid container spacing={3} mb={3}>
+                <Grid item xs={12} md={4}>
+                <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.main', color: 'white', borderRadius: 2, boxShadow: 4 }}>
+                    <Typography variant="h6" sx={{ opacity: 0.9 }}>Current Weighted GPA</Typography>
+                    <Typography variant="h2" sx={{ fontWeight: 'bold' }}>
+                        {gpaData?.currentGPA ? Number(gpaData.currentGPA).toFixed(2) : '0.00'}
+                    </Typography>
+                </Paper>
+                </Grid>
+            </Grid>
 
-      <Box mb={3} display="flex" justifyContent="flex-end">
-        <Button variant="contained" size="large" onClick={() => setOpen(true)} startIcon={<span>+</span>} sx={{ px: 4 }}>
-          Add Course
-        </Button>
-      </Box>
+            <Box mb={3} display="flex" justifyContent="flex-end">
+                <Button variant="contained" size="large" onClick={() => setOpen(true)} startIcon={<span>+</span>} sx={{ px: 4 }}>
+                Add Course
+                </Button>
+            </Box>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
-        <Table>
-          <TableHead sx={{ bgcolor: '#f8f9fa' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Course</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Semester</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Year</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Grade</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Credits</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {Array.isArray(records) && records.length > 0 ? records.map((row: AcademicRecord) => (
-              <TableRow key={row.id} hover>
-                <TableCell sx={{ fontWeight: 'medium' }}>{row.courseName}</TableCell>
-                <TableCell>{row.semester}</TableCell>
-                <TableCell>{row.year}</TableCell>
-                <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{row.grade}</Typography>
-                </TableCell>
-                <TableCell>{row.credits}</TableCell>
-                <TableCell>
-                  {row.isAP ? (
-                    <Typography variant="caption" sx={{ bgcolor: 'secondary.light', color: 'white', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>AP</Typography>
-                  ) : (row.isHonors ? (
-                    <Typography variant="caption" sx={{ bgcolor: 'info.light', color: 'white', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>Honors</Typography>
-                  ) : 'Regular')}
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton onClick={() => deleteMutation.mutate(row.id)} color="error" size="small">
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            )) : (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                    <Typography color="text.secondary">No academic records found. Start by adding your courses.</Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+                <Table>
+                <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+                    <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Course</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Semester</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Year</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Grade</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Credits</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {Array.isArray(records) && records.length > 0 ? records.map((row: AcademicRecord) => (
+                    <TableRow key={row.id} hover>
+                        <TableCell sx={{ fontWeight: 'medium' }}>{row.courseName}</TableCell>
+                        <TableCell>{row.semester}</TableCell>
+                        <TableCell>{row.year}</TableCell>
+                        <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{row.grade}</Typography>
+                        </TableCell>
+                        <TableCell>{row.credits}</TableCell>
+                        <TableCell>
+                        {row.isAP ? (
+                            <Typography variant="caption" sx={{ bgcolor: 'secondary.light', color: 'white', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>AP</Typography>
+                        ) : (row.isHonors ? (
+                            <Typography variant="caption" sx={{ bgcolor: 'info.light', color: 'white', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>Honors</Typography>
+                        ) : 'Regular')}
+                        </TableCell>
+                        <TableCell align="right">
+                        <IconButton onClick={() => deleteMutation.mutate(row.id)} color="error" size="small">
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                        </TableCell>
+                    </TableRow>
+                    )) : (
+                    <TableRow>
+                        <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                            <Typography color="text.secondary">No academic records found. Start by adding your courses.</Typography>
+                        </TableCell>
+                    </TableRow>
+                    )}
+                </TableBody>
+                </Table>
+            </TableContainer>
+          </>
+      )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold' }}>Add New Academic Record</DialogTitle>

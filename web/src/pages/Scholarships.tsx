@@ -47,6 +47,8 @@ const Scholarships: React.FC = () => {
     retry: false
   });
 
+  const queryEnabled = !isStaff || !!studentIdParam;
+
   const { data: scholarships, isLoading, error } = useQuery({
     queryKey: ['scholarships', studentIdParam],
     queryFn: async () => {
@@ -54,6 +56,7 @@ const Scholarships: React.FC = () => {
         const res = await axios.get(url);
         return res.data;
     },
+    enabled: queryEnabled,
     retry: false
   });
 
@@ -66,7 +69,7 @@ const Scholarships: React.FC = () => {
     }
   };
 
-  if (isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress /></Box>;
+  if (queryEnabled && isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress /></Box>;
 
   return (
     <Box p={3}>
@@ -102,43 +105,51 @@ const Scholarships: React.FC = () => {
         </Paper>
       )}
 
-      {error ? (
-        <Alert severity="error">Failed to load scholarships.</Alert>
+      {!queryEnabled ? (
+          <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
+              <Typography color="text.secondary">Please select a student from the dashboard or roadmap to view matching scholarships.</Typography>
+          </Paper>
       ) : (
-        <Grid container spacing={3}>
-          {Array.isArray(scholarships) && scholarships.length > 0 ? (
-            scholarships.map((s: any) => (
-              <Grid item xs={12} md={6} key={s.id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderLeft: '4px solid', borderColor: 'secondary.main', transition: '0.3s', '&:hover': { boxShadow: 4 } }}>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>{s.name}</Typography>
-                      <Chip label={`$${s.amount.toLocaleString()}`} color="success" sx={{ fontWeight: 'bold' }} />
-                    </Box>
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                      {s.description}
-                    </Typography>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 'bold', textTransform: 'uppercase', color: 'text.disabled' }}>Requirements</Typography>
-                    <Box display="flex" gap={1} mt={1}>
-                      <Chip label={`Min GPA: ${s.minGpa}`} size="small" variant="outlined" />
-                      <Chip label="Application Required" size="small" variant="outlined" />
-                    </Box>
-                  </CardContent>
-                  <CardActions sx={{ p: 2, bgcolor: '#fafafa' }}>
-                    <Button size="small" variant="contained" fullWidth>Apply Now</Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))
-          ) : (
-            <Grid item xs={12}>
-              <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
-                <Typography color="text.secondary">No scholarships matches found for this selection.</Typography>
-              </Paper>
-            </Grid>
-          )}
-        </Grid>
+          <>
+            {error ? (
+                <Alert severity="error">Failed to load scholarships.</Alert>
+            ) : (
+                <Grid container spacing={3}>
+                {Array.isArray(scholarships) && scholarships.length > 0 ? (
+                    scholarships.map((s: any) => (
+                    <Grid item xs={12} md={6} key={s.id}>
+                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderLeft: '4px solid', borderColor: 'secondary.main', transition: '0.3s', '&:hover': { boxShadow: 4 } }}>
+                        <CardContent sx={{ flexGrow: 1 }}>
+                            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>{s.name}</Typography>
+                            <Chip label={`$${s.amount.toLocaleString()}`} color="success" sx={{ fontWeight: 'bold' }} />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" paragraph>
+                            {s.description}
+                            </Typography>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 'bold', textTransform: 'uppercase', color: 'text.disabled' }}>Requirements</Typography>
+                            <Box display="flex" gap={1} mt={1}>
+                            <Chip label={`Min GPA: ${s.minGpa}`} size="small" variant="outlined" />
+                            <Chip label="Application Required" size="small" variant="outlined" />
+                            </Box>
+                        </CardContent>
+                        <CardActions sx={{ p: 2, bgcolor: '#fafafa' }}>
+                            <Button size="small" variant="contained" fullWidth>Apply Now</Button>
+                        </CardActions>
+                        </Card>
+                    </Grid>
+                    ))
+                ) : (
+                    <Grid item xs={12}>
+                    <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
+                        <Typography color="text.secondary">No scholarships matches found for this selection.</Typography>
+                    </Paper>
+                    </Grid>
+                )}
+                </Grid>
+            )}
+          </>
       )}
     </Box>
   );
