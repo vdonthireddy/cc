@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import axios from 'axios';
 import {
   Container,
@@ -10,8 +10,10 @@ import {
   Box,
   CircularProgress,
   Chip,
+  Alert
 } from '@mui/material';
 import { School as SchoolIcon } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 
 interface College {
   id: number;
@@ -23,32 +25,19 @@ interface College {
 }
 
 const CollegeList: React.FC = () => {
-  const [colleges, setColleges] = useState<College[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    const fetchColleges = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get(`/api/colleges?q=${search}`);
-        setColleges(response.data);
-      } catch (error) {
-        console.error('Error fetching colleges:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      fetchColleges();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [search]);
+  const { data: colleges, isLoading, error } = useQuery({
+    queryKey: ['colleges', search],
+    queryFn: async () => {
+        const response = await axios.get(`/api/colleges/?q=${search}`);
+        return response.data;
+    },
+    retry: false
+  });
 
   return (
-    <Container maxWidth="lg">
+    <Box p={3}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
         College Explorer
       </Typography>
@@ -57,24 +46,27 @@ const CollegeList: React.FC = () => {
           fullWidth
           label="Search Colleges"
           variant="outlined"
+          placeholder="Type to search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </Box>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+      {isLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
           <CircularProgress />
         </Box>
+      ) : error ? (
+        <Alert severity="error">Failed to load colleges.</Alert>
       ) : (
         <Grid container spacing={3}>
-          {colleges?.map((college) => (
+          {Array.isArray(colleges) && colleges.map((college: College) => (
             <Grid item xs={12} sm={6} md={4} key={college.id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { boxShadow: 4 } }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                     <SchoolIcon color="primary" sx={{ mr: 1 }} />
-                    <Typography variant="h6" component="div">
+                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
                       {college.name}
                     </Typography>
                   </Box>
@@ -86,20 +78,28 @@ const CollegeList: React.FC = () => {
                       label={`Acceptance: ${(college.acceptRate * 100).toFixed(1)}%`}
                       size="small"
                       sx={{ mr: 1, mb: 1 }}
+                      color="secondary"
+                      variant="outlined"
                     />
                     <Chip
                       label={`SAT Range: ${college.sat25th}-${college.sat75th}`}
                       size="small"
                       sx={{ mr: 1, mb: 1 }}
+                      variant="outlined"
                     />
                   </Box>
                 </CardContent>
               </Card>
             </Grid>
           ))}
+          {(!colleges || colleges.length === 0) && (
+              <Grid item xs={12}>
+                  <Typography align="center" color="text.secondary">No colleges found matching your search.</Typography>
+              </Grid>
+          )}
         </Grid>
       )}
-    </Container>
+    </Box>
   );
 };
 

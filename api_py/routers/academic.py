@@ -32,8 +32,11 @@ def get_target_student_id(user, requested_student_id):
             student = execute_query("SELECT studentId FROM StudentParent WHERE parentId = %s LIMIT 1", (user["id"],), fetch_one=True)
             return student["studentId"] if student else None
 
-        if (role in ["ADMIN", "COUNSELOR"]) and requested_student_id:
-            return int(requested_student_id)
+        if (role in ["ADMIN", "COUNSELOR"]):
+            if requested_student_id:
+                return int(requested_student_id)
+            # For Admin/Counselor, they MUST provide a studentId via query param
+            return None
         return None
     except Exception as e:
         print(f"[ACADEMIC] Error in get_target_student_id: {e}")
@@ -44,7 +47,11 @@ def get_academics(studentId: Optional[str] = None, current_user: dict = Depends(
     try:
         target_id = get_target_student_id(current_user, studentId)
         print(f"[ACADEMIC] GET / - User: {current_user['id']}, Role: {current_user['role']}, Target ID: {target_id}")
+        
         if not target_id:
+            # If Admin/Counselor, return empty list instead of 400 to avoid infinite spinner/crash
+            if current_user["role"].upper() in ["ADMIN", "COUNSELOR"]:
+                return []
             raise HTTPException(status_code=400, detail="Student ID required")
         
         records = execute_query("SELECT * FROM AcademicRecord WHERE studentId = %s ORDER BY year DESC, semester DESC", (target_id,))
@@ -99,6 +106,8 @@ def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(get_cu
     try:
         target_id = get_target_student_id(current_user, studentId)
         if not target_id:
+            if current_user["role"].upper() in ["ADMIN", "COUNSELOR"]:
+                return {"currentGPA": 0.0, "potentialGPA": 0.0}
             raise HTTPException(status_code=400, detail="Student ID required")
             
         records = execute_query("SELECT * FROM AcademicRecord WHERE studentId = %s", (target_id,))
@@ -115,6 +124,8 @@ def get_report_data(studentId: Optional[str] = None, current_user: dict = Depend
     try:
         target_id = get_target_student_id(current_user, studentId)
         if not target_id:
+            if current_user["role"].upper() in ["ADMIN", "COUNSELOR"]:
+                return []
             raise HTTPException(status_code=400, detail="Student ID required")
             
         records = execute_query("SELECT * FROM AcademicRecord WHERE studentId = %s ORDER BY year ASC, semester ASC", (target_id,))
@@ -145,6 +156,8 @@ def get_student_readiness(studentId: Optional[str] = None, current_user: dict = 
     try:
         target_id = get_target_student_id(current_user, studentId)
         if not target_id:
+            if current_user["role"].upper() in ["ADMIN", "COUNSELOR"]:
+                return {"currentGpa": 0.0, "milestones": [], "benchmarks": [], "readinessScore": 0}
             raise HTTPException(status_code=400, detail="Student ID required")
             
         student = execute_query("SELECT grade FROM Student WHERE id = %s", (target_id,), fetch_one=True)

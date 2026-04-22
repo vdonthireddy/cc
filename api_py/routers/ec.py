@@ -16,11 +16,14 @@ class ECRecord(BaseModel):
     studentId: Optional[int] = None
 
 def get_target_student_id(user, requested_student_id):
-    if user["role"].upper() == "STUDENT":
+    role = user["role"].upper()
+    if role == "STUDENT":
         student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
         return student["id"] if student else None
-    if (user["role"].upper() in ["ADMIN", "COUNSELOR"]) and requested_student_id:
-        return int(requested_student_id)
+    if (role in ["ADMIN", "COUNSELOR"]):
+        if requested_student_id:
+            return int(requested_student_id)
+        return None
     return None
 
 @router.get("/")
@@ -28,6 +31,8 @@ def get_ecs(studentId: Optional[str] = None, current_user: dict = Depends(get_cu
     try:
         target_id = get_target_student_id(current_user, studentId)
         if not target_id:
+            if current_user["role"].upper() in ["ADMIN", "COUNSELOR"]:
+                return []
             raise HTTPException(status_code=400, detail="Student ID required")
             
         ecs = execute_query("SELECT * FROM Extracurricular WHERE studentId = %s ORDER BY createdAt DESC", (target_id,))

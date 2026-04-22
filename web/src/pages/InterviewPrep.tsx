@@ -1,115 +1,159 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Box,
   Typography,
   Paper,
-  TextField,
-  IconButton,
+  Grid,
+  Button,
   List,
   ListItem,
   ListItemText,
-  Avatar,
+  ListItemIcon,
   Divider,
+  CircularProgress,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
-import { Send as SendIcon, School as SchoolIcon, Person as PersonIcon } from '@mui/icons-material';
-
-interface Message {
-  text: string;
-  sender: 'user' | 'ai';
-}
+import {
+  QuestionAnswer as ChatIcon,
+  VideoCall as VideoIcon,
+  CheckCircle as CheckIcon,
+  PersonSearch as PersonSearchIcon
+} from '@mui/icons-material';
+import { useAuthStore } from '../store/authStore';
 
 const InterviewPrep: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    { text: "Hello! I am an admissions officer from Harvard. Are you ready for your mock interview?", sender: 'ai' }
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuthStore();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+  const studentIdParam = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('studentId');
+  }, [location.search]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const userRole = user?.role?.toUpperCase();
+  const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
 
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { text: userMessage, sender: 'user' }]);
-    setIsLoading(true);
+  const { data: students } = useQuery({
+    queryKey: ['interviewStudents'],
+    queryFn: async () => {
+      if (!isStaff) return [];
+      const res = await axios.get('/api/counselor/students/');
+      return res.data;
+    },
+    enabled: isStaff,
+    retry: false
+  });
 
-    try {
-      // Pre-prompt context for the mock interview
-      const prePrompt = "Context: You are an admissions officer at Harvard. Conduct a mock interview for me. User says: ";
-      const response = await axios.post('/api/chat', { prompt: prePrompt + userMessage });
-      
-      setMessages(prev => [...prev, { text: response.data.response, sender: 'ai' }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { text: "Error: Could not connect to the admissions officer.", sender: 'ai' }]);
-    } finally {
-      setIsLoading(false);
+  const handleStudentChange = (event: any) => {
+    const newId = event.target.value;
+    if (newId) {
+      navigate(`/interview-prep?studentId=${newId}`);
+    } else {
+      navigate('/interview-prep');
     }
   };
 
+  const tips = [
+    "Research the college's core values and unique programs.",
+    "Prepare answers for 'Why this college?' and 'What can you contribute?'",
+    "Have 3-5 specific questions ready for your interviewer.",
+    "Dress professionally and find a quiet space for virtual interviews."
+  ];
+
+  const commonQuestions = [
+    "Tell me about yourself.",
+    "What is your greatest academic achievement?",
+    "How have you overcome a significant challenge?",
+    "What do you do in your free time?"
+  ];
+
   return (
-    <Box sx={{ height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-        Harvard Mock Interview
+    <Box p={3}>
+      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <ChatIcon fontSize="large" />
+        Interview Preparation
       </Typography>
-      
-      <Paper sx={{ flexGrow: 1, mb: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Box 
-          ref={scrollRef}
-          sx={{ flexGrow: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}
-        >
-          {messages?.map((msg, index) => (
-            <Box 
-              key={index} 
-              sx={{ 
-                display: 'flex', 
-                flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row',
-                alignItems: 'flex-start',
-                gap: 1
-              }}
+
+      {isStaff && (
+        <Paper sx={{ p: 3, mb: 4, borderLeft: '6px solid', borderColor: 'primary.main', boxShadow: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <PersonSearchIcon color="primary" />
+            <Typography variant="h6">Review Prep for Student</Typography>
+          </Box>
+          <FormControl fullWidth>
+            <InputLabel id="student-select-label">Student</InputLabel>
+            <Select
+              labelId="student-select-label"
+              id="student-select"
+              value={studentIdParam || ''}
+              label="Student"
+              onChange={handleStudentChange}
             >
-              <Avatar sx={{ bgcolor: msg.sender === 'user' ? 'secondary.main' : 'primary.main' }}>
-                {msg.sender === 'user' ? <PersonIcon /> : <SchoolIcon />}
-              </Avatar>
-              <Paper 
-                sx={{ 
-                  p: 1.5, 
-                  maxWidth: '70%', 
-                  borderRadius: 2,
-                  bgcolor: msg.sender === 'user' ? 'secondary.light' : 'grey.100',
-                  color: 'black'
-                }}
-              >
-                <Typography variant="body1">{msg.text}</Typography>
-              </Paper>
+              <MenuItem value=""><em>Select a student...</em></MenuItem>
+              {Array.isArray(students) && students.map((s: any) => (
+                <MenuItem key={s.id} value={s.id}>{s.name} (Grade {s.grade})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+      )}
+
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, height: '100%', borderRadius: 2, boxShadow: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
+              Interview Tips & Best Practices
+            </Typography>
+            <List>
+              {tips.map((tip, index) => (
+                <React.Fragment key={index}>
+                  <ListItem sx={{ px: 0 }}>
+                    <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
+                    <ListItemText primary={tip} />
+                  </ListItem>
+                  {index < tips.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
+            <Box mt={3}>
+              <Button variant="contained" fullWidth startIcon={<VideoIcon />}>
+                Practice with AI Mentor
+              </Button>
             </Box>
-          ))}
-          {isLoading && (
-            <Typography variant="caption" sx={{ ml: 6 }}>Admissions officer is typing...</Typography>
-          )}
-        </Box>
-        <Divider />
-        <Box sx={{ p: 2, display: 'flex', gap: 1 }}>
-          <TextField
-            fullWidth
-            placeholder="Type your response..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            disabled={isLoading}
-          />
-          <IconButton color="primary" onClick={handleSend} disabled={isLoading}>
-            <SendIcon />
-          </IconButton>
-        </Box>
-      </Paper>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, height: '100%', borderRadius: 2, boxShadow: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
+              Common Interview Questions
+            </Typography>
+            <List>
+              {commonQuestions.map((q, index) => (
+                <React.Fragment key={index}>
+                  <ListItem sx={{ px: 0 }}>
+                    <ListItemText primary={q} primaryTypographyProps={{ fontWeight: 'medium' }} />
+                  </ListItem>
+                  {index < commonQuestions.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
+            <Box mt={3}>
+              <Button variant="outlined" fullWidth color="primary">
+                Record Mock Response
+              </Button>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 };
