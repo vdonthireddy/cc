@@ -36,6 +36,26 @@ web/test-results/
 web/playwright-report/
 coverage/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+
 # IDEs
 .vscode/
 .idea/
