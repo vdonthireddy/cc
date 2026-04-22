@@ -45,6 +45,24 @@ async def add_ec(ec: ECRecord, current_user: dict = Depends(get_current_user)):
     ec_id = execute_commit(query, params)
     return {"id": ec_id, **ec.dict()}
 
+@router.delete("/{id}/")
+async def delete_ec(id: int, current_user: dict = Depends(get_current_user)):
+    user_id = current_user["id"]
+    user_role = current_user["role"].upper()
+    
+    if user_role == "STUDENT":
+        # Ensure they own the record
+        student = execute_query("SELECT id FROM Student WHERE userId = %s", (user_id,), fetch_one=True)
+        if not student:
+            raise HTTPException(status_code=404, detail="Student record not found")
+        
+        record = execute_query("SELECT studentId FROM Extracurricular WHERE id = %s", (id,), fetch_one=True)
+        if not record or record["studentId"] != student["id"]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+            
+    execute_commit("DELETE FROM Extracurricular WHERE id = %s", (id,))
+    return {"success": True}
+
 @router.post("/find-clubs")
 async def find_clubs(studentId: int, current_user: dict = Depends(get_current_user)):
     # Mock club discovery logic (previously triggered an agent)
