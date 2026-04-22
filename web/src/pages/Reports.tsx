@@ -14,11 +14,16 @@ const Reports: React.FC = () => {
   const role = user?.role?.toUpperCase();
   const [selectedStudentId, setSelectedStudentId] = React.useState<number | string>('');
 
-  const { data: parentStudents } = useQuery(['parent-students-reports'], async () => {
-    if (role !== 'PARENT') return [];
-    const res = await axios.get('/api/parent/students/');
-    return res.data;
-  }, { enabled: role === 'PARENT' });
+  const { data: parentStudents } = useQuery({
+    queryKey: ['parent-students-reports'],
+    queryFn: async () => {
+        if (role !== 'PARENT') return [];
+        const res = await axios.get('/api/parent/students/');
+        return res.data;
+    },
+    enabled: role === 'PARENT',
+    retry: false
+  });
 
   React.useEffect(() => {
     if (parentStudents && parentStudents.length > 0 && !selectedStudentId) {
@@ -26,20 +31,29 @@ const Reports: React.FC = () => {
     }
   }, [parentStudents, selectedStudentId]);
 
-  const { data, isLoading, error } = useQuery(['reports', role, selectedStudentId], async () => {
-    let endpoint = '';
-    if (role === 'ADMIN') endpoint = '/api/admin/reports/';
-    else if (role === 'COUNSELOR') endpoint = '/api/counselor/reports/';
-    else {
-      endpoint = '/api/academic/readiness/';
-      if (selectedStudentId) endpoint += `?studentId=${selectedStudentId}`;
-    }
-    const res = await axios.get(endpoint);
-    return res.data;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reports', role, selectedStudentId],
+    queryFn: async () => {
+        let endpoint = '';
+        if (role === 'ADMIN') endpoint = '/api/admin/reports/';
+        else if (role === 'COUNSELOR') endpoint = '/api/counselor/reports/';
+        else {
+          endpoint = '/api/academic/readiness/';
+          if (selectedStudentId) endpoint += `?studentId=${selectedStudentId}`;
+        }
+        const res = await axios.get(endpoint);
+        return res.data;
+    },
+    retry: false
   });
 
-  if (isLoading) return <CircularProgress />;
-  if (error) return <Alert severity="error">Failed to load report data.</Alert>;
+  if (isLoading) return (
+    <Box display="flex" justifyContent="center" p={10}>
+        <CircularProgress />
+    </Box>
+  );
+  
+  if (error) return <Box p={3}><Alert severity="error">Failed to load report data.</Alert></Box>;
 
   // --- Admin Visuals ---
   const adminEnrollmentSpec: any = {
@@ -109,13 +123,19 @@ const Reports: React.FC = () => {
       {role === 'ADMIN' && (
         <Grid container spacing={4}>
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}><Typography variant="h6" gutterBottom>Enrollment</Typography>
-              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}><VegaEmbed spec={adminEnrollmentSpec} options={{ actions: false }} /></Box>
+            <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>Enrollment</Typography>
+                <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
+                    <VegaEmbed spec={adminEnrollmentSpec} options={{ actions: false }} />
+                </Box>
             </Paper>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}><Typography variant="h6" gutterBottom>Counselor Workload</Typography>
-              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}><VegaEmbed spec={adminWorkloadSpec} options={{ actions: false }} /></Box>
+            <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>Counselor Workload</Typography>
+                <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
+                    <VegaEmbed spec={adminWorkloadSpec} options={{ actions: false }} />
+                </Box>
             </Paper>
           </Grid>
         </Grid>
@@ -124,7 +144,7 @@ const Reports: React.FC = () => {
       {role === 'COUNSELOR' && (
         <Grid container spacing={4}>
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>Cohort Application Pipeline</Typography>
               <Box sx={{ height: 250, display: 'flex', justifyContent: 'center' }}>
                 <VegaEmbed spec={counselorFunnelSpec} options={{ actions: false }} />
@@ -132,7 +152,7 @@ const Reports: React.FC = () => {
             </Paper>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>Top Target Colleges</Typography>
               <Box sx={{ height: 250, display: 'flex', justifyContent: 'center' }}>
                 <VegaEmbed spec={counselorCollegesSpec} options={{ actions: false }} />
@@ -140,7 +160,7 @@ const Reports: React.FC = () => {
             </Paper>
           </Grid>
           <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'error.main' }}>
                 Priority Action List: Students Needing Support
               </Typography>
@@ -185,23 +205,23 @@ const Reports: React.FC = () => {
       {(role === 'STUDENT' || role === 'PARENT') && (
         <Grid container spacing={4}>
           <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.main', color: 'white' }}>
+            <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.main', color: 'white', borderRadius: 2, boxShadow: 3 }}>
               <Typography variant="h6">Overall Readiness Score</Typography>
               <Typography variant="h1" sx={{ my: 2, fontWeight: 'bold' }}>{data?.readinessScore}</Typography>
               <LinearProgress variant="determinate" value={data?.readinessScore} color="secondary" sx={{ height: 10, borderRadius: 5, bgcolor: 'rgba(255,255,255,0.2)' }} />
             </Paper>
           </Grid>
           <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>College Benchmarks (GPA Comparison)</Typography>
+            <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>College Benchmarks (GPA Comparison)</Typography>
               <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Tier</TableCell>
-                      <TableCell>Target Median</TableCell>
-                      <TableCell>Your GPA</TableCell>
-                      <TableCell>Gap</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Tier</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Target Median</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Your GPA</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Gap</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>

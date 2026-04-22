@@ -65,7 +65,8 @@ const Layout: React.FC = () => {
     { text: 'Scholarships', icon: <ScholarshipIcon />, path: '/scholarships', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
     { text: 'LoR Manager', icon: <LoRIcon />, path: '/lor', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
     { text: 'Interview Prep', icon: <InterviewIcon />, path: '/interview-prep', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
-    { text: 'Academic', icon: <TimelineIcon />, path: '/roadmap', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
+    { text: 'Academic', icon: <TimelineIcon />, path: '/academic', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
+    { text: 'Roadmap', icon: <SchoolIcon />, path: '/roadmap', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
     { text: 'Vault', icon: <FolderIcon />, path: '/vault', roles: ['STUDENT', 'COUNSELOR', 'ADMIN'] },
     { text: 'Parent Dashboard', icon: <ParentIcon />, path: '/parent', roles: ['PARENT'] },
     { text: 'Counselor Dashboard', icon: <SchoolIcon />, path: '/counselor', roles: ['COUNSELOR'] },
@@ -86,10 +87,11 @@ const Layout: React.FC = () => {
       <List>
         {menuItems?.map((item) => (
           <ListItem key={item.text} disablePadding>
-
             <ListItemButton 
-              component={RouterLink} 
-              to={item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (mobileOpen) setMobileOpen(false);
+              }}
               selected={location.pathname === item.path}
             >
               <ListItemIcon sx={{ color: location.pathname === item.path ? 'secondary.main' : 'primary.main' }}>

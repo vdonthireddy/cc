@@ -255,7 +255,7 @@ const AdminSettings: React.FC = () => {
                         <TableCell>{student.gpa}</TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => { window.location.href=`/roadmap?studentId=${student.id}`; }}>Roadmap</Button>
+                            <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => { navigate(`/roadmap?studentId=${student.id}`); }}>Roadmap</Button>
                             <Button size="small" variant="outlined" color="secondary" startIcon={<EditIcon />} onClick={() => {
                               setSelectedStudent(student);
                               setFormData({
