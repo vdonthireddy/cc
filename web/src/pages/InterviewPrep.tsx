@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -18,13 +18,19 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField
 } from '@mui/material';
 import {
   QuestionAnswer as ChatIcon,
   VideoCall as VideoIcon,
   CheckCircle as CheckIcon,
-  PersonSearch as PersonSearchIcon
+  PersonSearch as PersonSearchIcon,
+  Psychology as AIMentorIcon
 } from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
 
@@ -33,6 +39,12 @@ const InterviewPrep: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [openMentor, setOpenMentor] = useState(false);
+  const [selectedQuestion, setSelectedQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [modelName, setModelName] = useState('');
+
   const studentIdParam = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get('studentId');
@@ -40,6 +52,33 @@ const InterviewPrep: React.FC = () => {
 
   const userRole = user?.role?.toUpperCase();
   const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
+
+  const commonQuestions = [
+    "Tell me about yourself.",
+    "What is your greatest academic achievement?",
+    "How have you overcome a significant challenge?",
+    "What do you do in your free time?",
+    "Why do you want to attend our college?"
+  ];
+
+  const feedbackMutation = useMutation({
+    mutationFn: async () => {
+      const res = await axios.post('/api/interview/feedback', { question: selectedQuestion, answer });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setFeedback(data.feedback);
+      setModelName(data.model_name);
+    }
+  });
+
+  const handleStartMentor = () => {
+    setOpenMentor(true);
+    setFeedback('');
+    setModelName('');
+    setAnswer('');
+    if (!selectedQuestion) setSelectedQuestion(commonQuestions[0]);
+  };
 
   const { data: students } = useQuery({
     queryKey: ['interviewStudents'],
@@ -66,13 +105,6 @@ const InterviewPrep: React.FC = () => {
     "Prepare answers for 'Why this college?' and 'What can you contribute?'",
     "Have 3-5 specific questions ready for your interviewer.",
     "Dress professionally and find a quiet space for virtual interviews."
-  ];
-
-  const commonQuestions = [
-    "Tell me about yourself.",
-    "What is your greatest academic achievement?",
-    "How have you overcome a significant challenge?",
-    "What do you do in your free time?"
   ];
 
   return (
@@ -124,7 +156,13 @@ const InterviewPrep: React.FC = () => {
               ))}
             </List>
             <Box mt={3}>
-              <Button variant="contained" fullWidth startIcon={<VideoIcon />}>
+              <Button 
+                variant="contained" 
+                fullWidth 
+                startIcon={<AIMentorIcon />}
+                onClick={handleStartMentor}
+                disabled={isStaff}
+              >
                 Practice with AI Mentor
               </Button>
             </Box>
@@ -147,13 +185,60 @@ const InterviewPrep: React.FC = () => {
               ))}
             </List>
             <Box mt={3}>
-              <Button variant="outlined" fullWidth color="primary">
+              <Button variant="outlined" fullWidth color="primary" disabled={isStaff}>
                 Record Mock Response
               </Button>
             </Box>
           </Paper>
         </Grid>
       </Grid>
+
+      <Dialog open={openMentor} onClose={() => setOpenMentor(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+          <AIMentorIcon color="primary" />
+          AI Interview Mentor
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="subtitle2" gutterBottom>Select a question to practice:</Typography>
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <Select 
+              value={selectedQuestion} 
+              onChange={(e) => setSelectedQuestion(e.target.value)}
+            >
+              {commonQuestions.map(q => <MenuItem key={q} value={q}>{q}</MenuItem>)}
+            </Select>
+          </FormControl>
+          
+          <Typography variant="subtitle2" gutterBottom>Your Response:</Typography>
+          <TextField 
+            fullWidth 
+            multiline 
+            rows={4} 
+            placeholder="Type your answer here..."
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+          />
+
+          {feedback && (
+            <Box mt={3} p={2} sx={{ bgcolor: 'info.light', borderRadius: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ color: 'white' }}>
+                Mentor Feedback ({modelName}):
+              </Typography>
+              <Typography variant="body1" sx={{ color: 'white', whiteSpace: 'pre-wrap' }}>{feedback}</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenMentor(false)}>Close</Button>
+          <Button 
+            variant="contained" 
+            onClick={() => feedbackMutation.mutate()}
+            disabled={!answer || feedbackMutation.isLoading}
+          >
+            {feedbackMutation.isLoading ? <CircularProgress size={24} /> : 'Get Feedback'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from ..database import execute_query, execute_commit
 from ..auth import get_current_user
+from ..agents import run_opportunity_scout
 from pydantic import BaseModel
 from typing import Optional
 import traceback
@@ -87,5 +88,8 @@ def delete_ec(id: int, current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/find-clubs")
-def find_clubs(studentId: int, current_user: dict = Depends(get_current_user)):
-    return {"message": "Scout agent triggered (Simulated)", "studentId": studentId}
+async def find_clubs(studentId: int, current_user: dict = Depends(get_current_user)):
+    result = await run_opportunity_scout(studentId)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result

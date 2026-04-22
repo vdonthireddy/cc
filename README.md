@@ -13,6 +13,49 @@ AI-driven college counseling platform MVP for US high schools.
    - **Admin Portal**: `http://localhost:3000/admin-login`
    - **DB UI (Adminer)**: `http://localhost:8080`
 
+## AI Quickstart (Agents & Chat)
+
+The platform features AI Agents for **Interview Prep**, **Opportunity Scouting**, and **Academic Roadmaps**. You can use a cloud provider or run a model locally on your MacBook.
+
+### 1. Configure the LLM
+Edit your `.env` file to choose your provider:
+
+**Option A: Local (Ollama - Recommended for privacy)**
+1. Install [Ollama](https://ollama.com/).
+2. **Network Setup**: By default, Ollama only listens to `localhost`. To allow the Docker container to connect, you must set `OLLAMA_HOST` to `0.0.0.0`.
+   - On your Mac, stop Ollama and run:
+     ```bash
+     export OLLAMA_HOST=0.0.0.0
+     ollama serve
+     ```
+3. Download your preferred model: 
+   - `ollama pull gemma:latest` (Lighter/Faster)
+   - `ollama pull llama3.1:8b` (Smarter/More detailed)
+4. Update `.env` to point to your chosen model:
+   ```env
+   LLM_PROVIDER=local
+   LLM_BASE_URL=http://host.docker.internal:11434/api/generate
+   LLM_MODEL=llama3.1:8b  # Switch to gemma:latest if preferred
+   ```
+
+**Option B: Cloud (Gemini or OpenAI)**
+1. Update `.env`:
+   ```env
+   LLM_PROVIDER=gemini  # or 'openai'
+   LLM_API_KEY=your_api_key_here
+   ```
+
+### 2. Apply Changes
+Restart the API to load the new configuration:
+```bash
+docker-compose up -d api
+```
+
+### 3. Test the Agents
+- **Interview Mentor**: Go to `Interview Prep` -> `Practice with AI Mentor`.
+- **Opportunity Scout**: Go to `Extracurriculars` -> `Discover Clubs`.
+- **Roadmap**: Go to `Academic Roadmap` to see your AI-generated 4-year plan.
+
 ## Tech Stack
 - **Frontend**: React 18, Vite, TypeScript, MUI v5, Vega-Lite, TanStack Query, Zustand.
 - **Backend**: Python 3.11, FastAPI, Uvicorn, `mysql-connector-python` (Raw SQL).

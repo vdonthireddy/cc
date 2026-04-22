@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .database import execute_query
 from .auth import create_access_token, verify_password, get_current_user
-from .routers import counselor, academic, admin, ec, lor, roadmap, scholarships, parent, documents
+from .routers import counselor, academic, admin, ec, lor, roadmap, scholarships, parent, documents, chat, interview
 import os
 import traceback
 
@@ -96,6 +96,8 @@ def health():
     return {"status": "ok"}
 
 # Include routers
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
 app.include_router(counselor.router, prefix="/api/counselor", tags=["counselor"])
 app.include_router(academic.router, prefix="/api/academic", tags=["academic"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
