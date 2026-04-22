@@ -34,28 +34,42 @@ const CounselorDashboard: React.FC = () => {
   const [reportOpen, setReportOpen] = React.useState(false);
   const [selectedStudent, setSelectedStudent] = React.useState<any>(null);
 
-  const { data: students, isLoading: studentsLoading, error: studentsError } = useQuery(['counselorStudents'], async () => {
-    const res = await axios.get('/api/counselor/students/');
-    return res.data;
+  const { data: students, isLoading: studentsLoading, error: studentsError } = useQuery({
+    queryKey: ['counselorStudents'],
+    queryFn: async () => {
+        const res = await axios.get('/api/counselor/students/');
+        return res.data;
+    },
+    retry: false
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery(['counselorStats'], async () => {
-    const res = await axios.get('/api/counselor/stats/');
-    return res.data;
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['counselorStats'],
+    queryFn: async () => {
+        const res = await axios.get('/api/counselor/stats/');
+        return res.data;
+    },
+    retry: false
   });
 
-  const { data: reportData, isLoading: reportLoading } = useQuery(
-    ['reportData', selectedStudent?.id],
-    async () => {
+  const { data: reportData, isLoading: reportLoading } = useQuery({
+    queryKey: ['reportData', selectedStudent?.id],
+    queryFn: async () => {
       if (!selectedStudent) return null;
       const res = await axios.get(`/api/academic/report-data/?studentId=${selectedStudent.id}`);
       return res.data;
     },
-    { enabled: !!selectedStudent && reportOpen }
-  );
+    enabled: !!selectedStudent && reportOpen,
+    retry: false
+  });
 
-  if (studentsLoading || statsLoading) return <CircularProgress />;
-  if (studentsError) return <Alert severity="error">Error loading dashboard data</Alert>;
+  if (studentsLoading || statsLoading) return (
+    <Box display="flex" justifyContent="center" p={10}>
+        <CircularProgress />
+    </Box>
+  );
+  
+  if (studentsError) return <Box p={3}><Alert severity="error">Error loading dashboard data</Alert></Box>;
 
   const progressSpec: any = {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
@@ -66,7 +80,7 @@ const CounselorDashboard: React.FC = () => {
     mark: { type: 'line', point: true },
     encoding: {
       x: { field: 'semester', type: 'ordinal', title: 'Semester', sort: null },
-      y: { field: 'gpa', type: 'quantitative', title: 'GPA', scale: { domain: [0, 4.5] } },
+      y: { field: 'gpa', type: 'quantitative', title: 'GPA', scale: { domain: [0, 5.0] } },
       tooltip: [
         { field: 'semester', type: 'ordinal' },
         { field: 'gpa', type: 'quantitative' },
@@ -76,14 +90,14 @@ const CounselorDashboard: React.FC = () => {
   };
 
   return (
-    <Box>
+    <Box p={2}>
       <Typography variant="h4" gutterBottom sx={{ color: 'primary.main', fontWeight: 'bold' }}>
         Counselor Panel
       </Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', bgcolor: 'primary.light', color: 'white' }}>
+          <Paper sx={{ p: 3, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', bgcolor: 'primary.light', color: 'white', borderRadius: 2, boxShadow: 3 }}>
             <Typography variant="h6" gutterBottom>Average GPA</Typography>
             <Typography variant="h2" sx={{ fontWeight: 'bold' }}>{stats?.avgGpa ? Number(stats.avgGpa).toFixed(2) : '0.00'}</Typography>
             <Typography variant="body2">Cohort 2024 ({stats?.totalStudents ?? 0} students)</Typography>
@@ -91,8 +105,8 @@ const CounselorDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ color: 'primary.dark' }}>Student Overview</Typography>
+          <Paper sx={{ p: 3, height: '100%', borderRadius: 2, boxShadow: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ color: 'primary.dark', fontWeight: 'bold' }}>Student Overview</Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -122,13 +136,13 @@ const CounselorDashboard: React.FC = () => {
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                          <IconButton size="small" title="Roadmap" onClick={() => { window.location.href = `/roadmap?studentId=${student.id}`; }}>
+                          <IconButton size="small" title="Roadmap" onClick={() => { navigate(`/roadmap?studentId=${student.id}`); }}>
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" color="primary" title="Academics" onClick={() => { window.location.href = `/academic?studentId=${student.id}`; }}>
+                          <IconButton size="small" color="primary" title="Academics" onClick={() => { navigate(`/academic?studentId=${student.id}`); }}>
                             <SchoolIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" color="secondary" title="Clubs" onClick={() => { window.location.href = `/ec?studentId=${student.id}`; }}>
+                          <IconButton size="small" color="secondary" title="Clubs" onClick={() => { navigate(`/ec?studentId=${student.id}`); }}>
                             <GroupIcon fontSize="small" />
                           </IconButton>
                           <IconButton size="small" color="info" title="Progress Report" onClick={() => { setSelectedStudent(student); setReportOpen(true); }}>
@@ -151,20 +165,20 @@ const CounselorDashboard: React.FC = () => {
 
       {/* Progress Report Dialog */}
       <Dialog open={reportOpen} onClose={() => setReportOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Academic Progress: {selectedStudent?.name}</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Academic Progress: {selectedStudent?.name}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }} dividers>
           {reportLoading ? (
             <CircularProgress />
           ) : Array.isArray(reportData) && reportData.length > 0 ? (
-            <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
+            <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
               <VegaEmbed spec={progressSpec} options={{ actions: false }} />
             </Box>
           ) : (
             <Typography color="text.secondary">No academic data available for this student.</Typography>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReportOpen(false)}>Close</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setReportOpen(false)} color="inherit">Close</Button>
           <Button variant="contained" color="primary" onClick={() => window.print()}>Print Report</Button>
         </DialogActions>
       </Dialog>

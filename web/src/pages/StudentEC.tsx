@@ -47,16 +47,21 @@ const StudentEC = () => {
     weeksPerYear: 0
   });
 
-  const { data: ecs, isLoading, error } = useQuery(['ecs', studentIdParam], async () => {
-    const url = studentIdParam ? `/api/ec/?studentId=${studentIdParam}` : '/api/ec/';
-    const res = await axios.get(url);
-    return res.data;
-  }, { retry: false });
+  const { data: ecs, isLoading, error } = useQuery({
+    queryKey: ['ecs', studentIdParam],
+    queryFn: async () => {
+        const url = studentIdParam ? `/api/ec/?studentId=${studentIdParam}` : '/api/ec/';
+        const res = await axios.get(url);
+        return res.data;
+    },
+    retry: false
+  });
 
-  const addMutation = useMutation((newEC: any) => 
-    axios.post(`/api/ec/`, { ...newEC, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
+  const addMutation = useMutation({
+    mutationFn: (newEC: any) => 
+        axios.post(`/api/ec/`, { ...newEC, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['ecs', studentIdParam]);
+      queryClient.invalidateQueries({ queryKey: ['ecs', studentIdParam] });
       setOpen(false);
       setFormData({ name: '', role: '', impactDescription: '', hoursPerWeek: 0, weeksPerYear: 0 });
       setSnackbar({ open: true, message: 'Activity logged successfully!', severity: 'success' });
@@ -66,16 +71,16 @@ const StudentEC = () => {
     }
   });
 
-  const deleteMutation = useMutation((id: number) => 
-    axios.delete(`/api/ec/${id}/`), {
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => axios.delete(`/api/ec/${id}/`),
     onSuccess: () => {
-      queryClient.invalidateQueries(['ecs', studentIdParam]);
+      queryClient.invalidateQueries({ queryKey: ['ecs', studentIdParam] });
       setSnackbar({ open: true, message: 'Activity deleted.', severity: 'success' });
     }
   });
 
-  const discoveryMutation = useMutation(() => 
-    axios.post(`/api/ec/find-clubs`, { studentId: studentIdParam ? parseInt(studentIdParam) : user?.studentId }), {
+  const discoveryMutation = useMutation({
+    mutationFn: () => axios.post(`/api/ec/find-clubs`, { studentId: studentIdParam ? parseInt(studentIdParam) : user?.studentId }),
     onSuccess: (data) => {
       setSnackbar({ open: true, message: 'Scout agent triggered! Checking for matches...', severity: 'success' });
     }

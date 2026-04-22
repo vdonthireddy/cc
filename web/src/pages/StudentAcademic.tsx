@@ -24,7 +24,6 @@ const StudentAcademic = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
   
-  // Memoize search params to prevent unnecessary query triggers
   const studentIdParam = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get('studentId');
@@ -41,23 +40,32 @@ const StudentAcademic = () => {
     isHonors: false
   });
 
-  const { data: records, isLoading: recordsLoading, error: recordsError } = useQuery(['academics', studentIdParam], async () => {
-    const url = studentIdParam ? `/api/academic/?studentId=${studentIdParam}` : '/api/academic/';
-    const res = await axios.get(url);
-    return res.data;
-  }, { retry: false });
+  const { data: records, isLoading: recordsLoading, error: recordsError } = useQuery({
+    queryKey: ['academics', studentIdParam],
+    queryFn: async () => {
+      const url = studentIdParam ? `/api/academic/?studentId=${studentIdParam}` : '/api/academic/';
+      const res = await axios.get(url);
+      return res.data;
+    },
+    retry: false
+  });
 
-  const { data: gpaData, isLoading: gpaLoading, error: gpaError } = useQuery(['gpa', studentIdParam], async () => {
-    const url = studentIdParam ? `/api/academic/gpa/?studentId=${studentIdParam}` : '/api/academic/gpa/';
-    const res = await axios.get(url);
-    return res.data;
-  }, { retry: false });
+  const { data: gpaData, isLoading: gpaLoading, error: gpaError } = useQuery({
+    queryKey: ['gpa', studentIdParam],
+    queryFn: async () => {
+      const url = studentIdParam ? `/api/academic/gpa/?studentId=${studentIdParam}` : '/api/academic/gpa/';
+      const res = await axios.get(url);
+      return res.data;
+    },
+    retry: false
+  });
 
-  const addMutation = useMutation((newRecord: any) => 
-    axios.post(`/api/academic/`, { ...newRecord, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
+  const addMutation = useMutation({
+    mutationFn: (newRecord: any) => 
+      axios.post(`/api/academic/`, { ...newRecord, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['academics', studentIdParam]);
-      queryClient.invalidateQueries(['gpa', studentIdParam]);
+      queryClient.invalidateQueries({ queryKey: ['academics', studentIdParam] });
+      queryClient.invalidateQueries({ queryKey: ['gpa', studentIdParam] });
       setOpen(false);
       setFormData({
         courseName: '',
@@ -71,11 +79,11 @@ const StudentAcademic = () => {
     }
   });
 
-  const deleteMutation = useMutation((id: number) => 
-    axios.delete(`/api/academic/${id}/`), {
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => axios.delete(`/api/academic/${id}/`),
     onSuccess: () => {
-      queryClient.invalidateQueries(['academics', studentIdParam]);
-      queryClient.invalidateQueries(['gpa', studentIdParam]);
+      queryClient.invalidateQueries({ queryKey: ['academics', studentIdParam] });
+      queryClient.invalidateQueries({ queryKey: ['gpa', studentIdParam] });
     }
   });
 
@@ -84,9 +92,6 @@ const StudentAcademic = () => {
     if (!formData.courseName) return;
     addMutation.mutate(formData);
   };
-
-  const semesters = ['Fall', 'Spring', 'Summer', 'Winter'];
-  const grades = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'];
 
   if (recordsLoading || gpaLoading) {
     return (
@@ -161,7 +166,7 @@ const StudentAcademic = () => {
                   ) : 'Regular')}
                 </TableCell>
                 <TableCell align="right">
-                  <IconButton onClick={() => deleteMutation.mutate(row.id)} color="error" size="small" disabled={deleteMutation.isLoading}>
+                  <IconButton onClick={() => deleteMutation.mutate(row.id)} color="error" size="small">
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </TableCell>
@@ -197,7 +202,7 @@ const StudentAcademic = () => {
                   value={formData.semester}
                   onChange={(e) => setFormData({...formData, semester: e.target.value})}
                 >
-                  {semesters?.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  {['Fall', 'Spring', 'Summer', 'Winter'].map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                 </TextField>
               </Grid>
               <Grid item xs={6}>
@@ -215,7 +220,7 @@ const StudentAcademic = () => {
                   value={formData.grade}
                   onChange={(e) => setFormData({...formData, grade: e.target.value})}
                 >
-                  {grades?.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                  {['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'].map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
                 </TextField>
               </Grid>
               <Grid item xs={6}>

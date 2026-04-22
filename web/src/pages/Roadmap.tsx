@@ -41,11 +41,16 @@ const Roadmap: React.FC = () => {
   const userRole = user?.role?.toUpperCase();
   const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
 
-  const { data: students } = useQuery(['roadmapStudents'], async () => {
-    if (!isStaff) return [];
-    const res = await axios.get('/api/counselor/students/');
-    return res.data;
-  }, { enabled: isStaff, retry: false });
+  const { data: students } = useQuery({
+    queryKey: ['roadmapStudents'],
+    queryFn: async () => {
+      if (!isStaff) return [];
+      const res = await axios.get('/api/counselor/students/');
+      return res.data;
+    },
+    enabled: isStaff,
+    retry: false
+  });
 
   const { data: roadmap, isLoading, error } = useQuery<RoadmapYear[]>({
     queryKey: ['roadmap', studentId],
@@ -70,7 +75,7 @@ const Roadmap: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 10 }}>
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" p={10}>
         <CircularProgress size={60} />
         <Typography sx={{ mt: 2 }} color="text.secondary">Loading roadmap...</Typography>
       </Box>

@@ -5,28 +5,47 @@ import axios from 'axios';
 import { VegaEmbed } from 'react-vega';
 
 const StudentDashboard: React.FC = () => {
-  const { data: readiness, isLoading: readinessLoading } = useQuery(['readiness'], async () => {
-    const res = await axios.get('/api/academic/readiness/');
-    return res.data;
+  const { data: readiness, isLoading: readinessLoading } = useQuery({
+    queryKey: ['readiness'],
+    queryFn: async () => {
+        const res = await axios.get('/api/academic/readiness/');
+        return res.data;
+    },
+    retry: false
   });
 
-  const { data: gpaTrend, isLoading: trendLoading } = useQuery(['gpaTrend'], async () => {
-    const res = await axios.get('/api/academic/report-data/');
-    return res.data;
+  const { data: gpaTrend, isLoading: trendLoading } = useQuery({
+    queryKey: ['gpaTrend'],
+    queryFn: async () => {
+        const res = await axios.get('/api/academic/report-data/');
+        return res.data;
+    },
+    retry: false
   });
 
-  const { data: ecs, isLoading: ecsLoading } = useQuery(['ecs-summary'], async () => {
-    const res = await axios.get('/api/ec/');
-    return res.data;
+  const { data: ecs, isLoading: ecsLoading } = useQuery({
+    queryKey: ['ecs-summary'],
+    queryFn: async () => {
+        const res = await axios.get('/api/ec/');
+        return res.data;
+    },
+    retry: false
   });
 
-  const { data: detailData, isLoading: detailLoading } = useQuery(['studentDetail'], async () => {
-    // This is primarily for parent view but can be used for summary in dashboard
-    const res = await axios.get('/api/parent/'); 
-    return res.data;
-  }, { retry: false });
+  const { data: detailData, isLoading: detailLoading } = useQuery({
+    queryKey: ['studentDetail'],
+    queryFn: async () => {
+        const res = await axios.get('/api/parent/'); 
+        return res.data;
+    },
+    retry: false
+  });
 
-  if (readinessLoading || trendLoading || ecsLoading) return <CircularProgress />;
+  if (readinessLoading || trendLoading || ecsLoading) return (
+    <Box display="flex" justifyContent="center" p={10}>
+        <CircularProgress />
+    </Box>
+  );
 
   const gpaSpec: any = {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
