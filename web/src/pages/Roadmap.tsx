@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -13,8 +13,15 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Paper,
+  Alert
 } from '@mui/material';
-import { School as SchoolIcon } from '@mui/icons-material';
+import { School as SchoolIcon, PersonSearch as PersonSearchIcon } from '@mui/icons-material';
+import { useAuthStore } from '../store/authStore';
 
 interface RoadmapYear {
   year: number;
@@ -23,17 +30,39 @@ interface RoadmapYear {
 
 const Roadmap: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
   const searchParams = new URLSearchParams(location.search);
   const studentId = searchParams.get('studentId');
+  const userRole = user?.role?.toUpperCase();
+  const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
+
+  const { data: students } = useQuery(['roadmapStudents'], async () => {
+    if (!isStaff) return [];
+    const res = await axios.get('/api/counselor/students/');
+    return res.data;
+  }, { enabled: isStaff });
 
   const { data: roadmap, isLoading, error } = useQuery<RoadmapYear[]>({
     queryKey: ['roadmap', studentId],
     queryFn: async () => {
+      // If staff but no studentId, don't fetch yet
+      if (isStaff && !studentId) return [];
       const url = `/api/roadmap/${studentId ? `?studentId=${studentId}` : ''}`;
       const response = await axios.get(url);
       return response.data;
     },
+    enabled: !isStaff || !!studentId
   });
+
+  const handleStudentChange = (event: any) => {
+    const newId = event.target.value;
+    if (newId) {
+      navigate(`/roadmap?studentId=${newId}`);
+    } else {
+      navigate('/roadmap');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -43,87 +72,122 @@ const Roadmap: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Box sx={{ mt: 4 }}>
-        <Typography color="error">Error loading roadmap. Please try again later.</Typography>
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', py: 4 }}>
+    <Box sx={{ maxWidth: 800, mx: 'auto', py: 4, px: 2 }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
         Academic Roadmap
       </Typography>
-      <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
-        Based on interests and current grade, here is the recommended path through high school.
-      </Typography>
+      
+      {isStaff && (
+        <Paper sx={{ p: 3, mb: 4, borderLeft: '6px solid', borderColor: 'primary.main' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <PersonSearchIcon color="primary" />
+            <Typography variant="h6">Select Student to View Roadmap</Typography>
+          </Box>
+          <FormControl fullWidth>
+            <InputLabel id="student-select-label">Student</InputLabel>
+            <Select
+              labelId="student-select-label"
+              id="student-select"
+              value={studentId || ''}
+              label="Student"
+              onChange={handleStudentChange}
+            >
+              <MenuItem value=""><em>Select a student...</em></MenuItem>
+              {Array.isArray(students) && students.map((s: any) => (
+                <MenuItem key={s.id} value={s.id}>{s.name} (Grade {s.grade})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+      )}
 
-      <Box sx={{ position: 'relative' }}>
-        <Box
-          sx={{
-            position: 'absolute',
-            left: 24,
-            top: 0,
-            bottom: 0,
-            width: 2,
-            bgcolor: 'divider',
-            zIndex: 0,
-          }}
-        />
+      {error ? (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {axios.isAxiosError(error) && error.response?.status === 404 
+            ? "Student records not found. Please ensure the student has a profile."
+            : "Error loading roadmap. Please try again later."}
+        </Alert>
+      ) : isStaff && !studentId ? (
+        <Box sx={{ textAlign: 'center', py: 8, opacity: 0.6 }}>
+          <SchoolIcon sx={{ fontSize: 60, mb: 2 }} color="disabled" />
+          <Typography variant="h6" color="text.secondary">Please select a student above to see their academic path.</Typography>
+        </Box>
+      ) : (
+        <>
+          <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
+            Based on interests and current grade, here is the recommended path through high school.
+          </Typography>
 
-        {roadmap?.map((item) => (
-          <Box key={item.year} sx={{ display: 'flex', mb: 4, position: 'relative', zIndex: 1 }}>
+          <Box sx={{ position: 'relative' }}>
             <Box
               sx={{
-                width: 50,
-                height: 50,
-                borderRadius: '50%',
-                bgcolor: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                mr: 3,
-                flexShrink: 0,
-                boxShadow: 2,
+                position: 'absolute',
+                left: 24,
+                top: 0,
+                bottom: 0,
+                width: 2,
+                bgcolor: 'divider',
+                zIndex: 0,
               }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {item.year}
-              </Typography>
-            </Box>
+            />
 
-            <Card sx={{ flexGrow: 1, borderLeft: '4px solid', borderColor: 'secondary.main' }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Grade {item.year}
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <List dense disablePadding>
-                  {item.courses?.map((course, cIndex) => {
-                    const isRecommended = course.startsWith('*');
-                    return (
-                      <ListItem key={cIndex} disableGutters>
-                        <ListItemIcon sx={{ minWidth: 32 }}>
-                          <SchoolIcon fontSize="small" color={isRecommended ? 'secondary' : 'primary'} />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={isRecommended ? course.substring(2) : course}
-                          primaryTypographyProps={{
-                            sx: isRecommended ? { fontWeight: 'bold', fontStyle: 'italic', color: 'secondary.main' } : {},
-                          }}
-                        />
-                      </ListItem>
-                    );
-                  })}
-                </List>
-              </CardContent>
-            </Card>
+            {Array.isArray(roadmap) && roadmap.map((item) => (
+              <Box key={item.year} sx={{ display: 'flex', mb: 4, position: 'relative', zIndex: 1 }}>
+                <Box
+                  sx={{
+                    width: 50,
+                    height: 50,
+                    borderRadius: '50%',
+                    bgcolor: 'primary.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    mr: 3,
+                    flexShrink: 0,
+                    boxShadow: 2,
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    {item.year}
+                  </Typography>
+                </Box>
+
+                <Card sx={{ flexGrow: 1, borderLeft: '4px solid', borderColor: 'secondary.main' }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      Grade {item.year}
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <List dense disablePadding>
+                      {item.courses?.map((course, cIndex) => {
+                        const isRecommended = course.startsWith('*');
+                        return (
+                          <ListItem key={cIndex} disableGutters>
+                            <ListItemIcon sx={{ minWidth: 32 }}>
+                              <SchoolIcon fontSize="small" color={isRecommended ? 'secondary' : 'primary'} />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={isRecommended ? course.substring(2) : course}
+                              primaryTypographyProps={{
+                                sx: isRecommended ? { fontWeight: 'bold', fontStyle: 'italic', color: 'secondary.main' } : {},
+                              }}
+                            />
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Box>
+            ))}
+            {Array.isArray(roadmap) && roadmap.length === 0 && !isLoading && (
+               <Typography color="text.secondary" align="center">No roadmap data available for this selection.</Typography>
+            )}
           </Box>
-        ))}
-      </Box>
+        </>
+      )}
     </Box>
   );
 };
