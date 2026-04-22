@@ -26,9 +26,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        console.log('[APP] Initializing auth...');
         const response = await axios.get('/api/auth/me');
-        setAuth(response.data.user);
+        if (response.data && response.data.user) {
+          setAuth(response.data.user);
+        } else {
+          setAuth(null);
+        }
       } catch (error) {
+        console.log('[APP] Auth check failed (not logged in)');
         setAuth(null);
       } finally {
         setInitialized(true);
@@ -40,8 +46,8 @@ const App: React.FC = () => {
 
   if (!isInitialized) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'background.default' }}>
+        <CircularProgress size={60} />
       </Box>
     );
   }
