@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from ..database import execute_query, execute_commit
 from ..auth import get_current_user
+from ..utils import calculate_weighted_gpa
 from pydantic import BaseModel
 from typing import Optional
 
@@ -15,21 +16,6 @@ class AcademicRecord(BaseModel):
     isAP: bool = False
     isHonors: bool = False
     studentId: Optional[int] = None
-
-def calculate_gpa(records):
-    grade_points = {
-        "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7,
-        "C+": 2.3, "C": 2.0, "C-": 1.7, "D+": 1.3, "D": 1.0, "F": 0.0
-    }
-    total_points = 0.0
-    total_credits = 0.0
-    for r in records:
-        base = grade_points.get(r["grade"] or "", 0.0)
-        weight = 1.0 if r["isAP"] else (0.5 if r["isHonors"] else 0.0)
-        credits = r["credits"] or 1.0
-        total_points += (base + weight) * credits
-        total_credits += credits
-    return round(total_points / total_credits, 2) if total_credits > 0 else 0.0
 
 async def get_target_student_id(user, requested_student_id):
     role = user["role"].upper()
@@ -80,7 +66,7 @@ async def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(
         raise HTTPException(status_code=400, detail="Student ID required")
         
     records = execute_query("SELECT * FROM AcademicRecord WHERE studentId = %s", (target_id,))
-    current_gpa = calculate_gpa(records)
+    current_gpa = calculate_weighted_gpa(records)
     return {"currentGPA": current_gpa, "potentialGPA": current_gpa}
 
 @router.get("/report-data")
@@ -98,9 +84,11 @@ async def get_report_data(studentId: Optional[str] = None, current_user: dict = 
     
     trend = []
     for r in records:
+        base = grade_points.get(r["grade"] or "", 0.0)
+        weight = 1.0 if r["isAP"] else (0.5 if r["isHonors"] else 0.0)
         trend.append({
             "semester": f"{r['semester']} {r['year']}",
-            "gpa": grade_points.get(r["grade"] or "", 0.0),
+            "gpa": base + weight,
             "course": r["courseName"]
         })
     return trend
@@ -113,7 +101,7 @@ async def get_student_readiness(studentId: Optional[str] = None, current_user: d
         
     student = execute_query("SELECT grade FROM Student WHERE id = %s", (target_id,), fetch_one=True)
     records = execute_query("SELECT grade, credits, isAP, isHonors FROM AcademicRecord WHERE studentId = %s", (target_id,))
-    current_gpa = calculate_gpa(records)
+    current_gpa = calculate_weighted_gpa(records)
     
     # 1. Milestone Progress
     grade = student["grade"]

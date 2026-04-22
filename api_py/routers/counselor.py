@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from ..database import execute_query
 from ..auth import get_current_user
+from ..utils import calculate_weighted_gpa, GPA_SQL_SNIPPET
 from typing import Optional
 
 router = APIRouter()
@@ -32,21 +33,7 @@ async def get_students(current_user: dict = Depends(get_current_user)):
         academic_query = "SELECT grade, credits, isAP, isHonors FROM AcademicRecord WHERE studentId = %s"
         records = execute_query(academic_query, (student["id"],))
         
-        grade_points = {
-            "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7,
-            "C+": 2.3, "C": 2.0, "C-": 1.7, "D+": 1.3, "D": 1.0, "F": 0.0
-        }
-        
-        total_points = 0.0
-        total_credits = 0.0
-        for r in records:
-            base = grade_points.get(r["grade"] or "", 0.0)
-            weight = 1.0 if r["isAP"] else (0.5 if r["isHonors"] else 0.0)
-            credits = r["credits"] or 1.0
-            total_points += (base + weight) * credits
-            total_credits += credits
-            
-        student["gpa"] = round(total_points / total_credits, 2) if total_credits > 0 else 0.0
+        student["gpa"] = calculate_weighted_gpa(records)
         student["riskLevel"] = "High" if student["gpa"] < 2.5 else ("Medium" if student["gpa"] < 3.3 else "Low")
             
     return students
@@ -59,23 +46,30 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
     if user_role not in ["COUNSELOR", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Forbidden")
         
-    query = "SELECT id FROM Student"
-    params = []
-    if user_role == "COUNSELOR":
-        query += " WHERE counselorId = %s"
-        params.append(user_id)
-        
-    students = execute_query(query, tuple(params))
+    where = "WHERE counselorId = %s" if user_role == "COUNSELOR" else ""
+    params = (user_id,) if user_role == "COUNSELOR" else ()
+    
+    query = f"SELECT id FROM Student {where}"
+    students = execute_query(query, params)
+    
+    # Calculate real average GPA for the cohort
+    gpas = []
+    for s in students:
+        records = execute_query("SELECT grade, credits, isAP, isHonors FROM AcademicRecord WHERE studentId = %s", (s["id"],))
+        if records:
+            gpas.append(calculate_weighted_gpa(records))
+    
+    avg_gpa = round(sum(gpas) / len(gpas), 2) if gpas else 0.0
     
     return {
-        "avgGpa": 3.42,
+        "avgGpa": avg_gpa,
         "totalStudents": len(students),
         "distribution": [
-            {"range": "2.0-2.5", "count": 5},
-            {"range": "2.5-3.0", "count": 12},
-            {"range": "3.0-3.5", "count": 18},
-            {"range": "3.5-4.0", "count": 10},
-            {"range": "4.0+", "count": 5},
+            {"range": "0.0-2.5", "count": sum(1 for g in gpas if g < 2.5)},
+            {"range": "2.5-3.0", "count": sum(1 for g in gpas if 2.5 <= g < 3.0)},
+            {"range": "3.0-3.5", "count": sum(1 for g in gpas if 3.0 <= g < 3.5)},
+            {"range": "3.5-4.0", "count": sum(1 for g in gpas if 3.5 <= g < 4.0)},
+            {"range": "4.0+", "count": sum(1 for g in gpas if g >= 4.0)},
         ]
     }
 
@@ -118,11 +112,7 @@ async def get_counselor_reports(current_user: dict = Depends(get_current_user)):
     priority_list = execute_query(f"""
         SELECT u.name, u.email, 
                (SELECT COUNT(*) FROM Extracurricular WHERE studentId = s.id) as ecCount,
-               (SELECT ROUND(AVG(CASE grade 
-                    WHEN 'A' THEN 4.0 WHEN 'A-' THEN 3.7 WHEN 'B+' THEN 3.3 
-                    WHEN 'B' THEN 3.0 WHEN 'B-' THEN 2.7 WHEN 'C+' THEN 2.3 
-                    WHEN 'C' THEN 2.0 WHEN 'F' THEN 0.0 END), 2)
-                FROM AcademicRecord WHERE studentId = s.id) as currentGpa
+               {GPA_SQL_SNIPPET} as currentGpa
         FROM Student s
         JOIN User u ON s.userId = u.id
         {where}
