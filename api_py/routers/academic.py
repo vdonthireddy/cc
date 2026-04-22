@@ -18,7 +18,7 @@ class AcademicRecord(BaseModel):
     isHonors: bool = False
     studentId: Optional[int] = None
 
-async def get_target_student_id(user, requested_student_id):
+def get_target_student_id(user, requested_student_id):
     try:
         role = user["role"].upper()
         if role == "STUDENT":
@@ -40,23 +40,25 @@ async def get_target_student_id(user, requested_student_id):
         return None
 
 @router.get("/")
-async def get_academics(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+def get_academics(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
-        target_id = await get_target_student_id(current_user, studentId)
+        target_id = get_target_student_id(current_user, studentId)
         print(f"[ACADEMIC] GET / - User: {current_user['id']}, Role: {current_user['role']}, Target ID: {target_id}")
         if not target_id:
             raise HTTPException(status_code=400, detail="Student ID required")
         
         records = execute_query("SELECT * FROM AcademicRecord WHERE studentId = %s ORDER BY year DESC, semester DESC", (target_id,))
         return records
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ACADEMIC] Exception in GET /: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/")
-async def add_academic(record: AcademicRecord, current_user: dict = Depends(get_current_user)):
+def add_academic(record: AcademicRecord, current_user: dict = Depends(get_current_user)):
     try:
-        target_id = await get_target_student_id(current_user, record.studentId)
+        target_id = get_target_student_id(current_user, record.studentId)
         if not target_id:
             raise HTTPException(status_code=400, detail="Student ID required")
         
@@ -67,14 +69,16 @@ async def add_academic(record: AcademicRecord, current_user: dict = Depends(get_
         params = (target_id, record.courseName, record.grade, record.credits, record.semester, record.year, record.isAP, record.isHonors)
         record_id = execute_commit(query, params)
         return {"id": record_id, **record.dict()}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ACADEMIC] Exception in POST /: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{id}/")
-async def delete_academic(id: int, current_user: dict = Depends(get_current_user)):
+def delete_academic(id: int, current_user: dict = Depends(get_current_user)):
     try:
-        target_id = await get_target_student_id(current_user, None)
+        target_id = get_target_student_id(current_user, None)
         if current_user["role"].upper() == "STUDENT":
             if not target_id:
                 raise HTTPException(status_code=404, detail="Student not found")
@@ -84,28 +88,32 @@ async def delete_academic(id: int, current_user: dict = Depends(get_current_user
                 
         execute_commit("DELETE FROM AcademicRecord WHERE id = %s", (id,))
         return {"success": True}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ACADEMIC] Exception in DELETE /{id}: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/gpa/")
-async def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
-        target_id = await get_target_student_id(current_user, studentId)
+        target_id = get_target_student_id(current_user, studentId)
         if not target_id:
             raise HTTPException(status_code=400, detail="Student ID required")
             
         records = execute_query("SELECT * FROM AcademicRecord WHERE studentId = %s", (target_id,))
         current_gpa = calculate_weighted_gpa(records)
         return {"currentGPA": current_gpa, "potentialGPA": current_gpa}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ACADEMIC] Exception in GET /gpa/: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/report-data/")
-async def get_report_data(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+def get_report_data(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
-        target_id = await get_target_student_id(current_user, studentId)
+        target_id = get_target_student_id(current_user, studentId)
         if not target_id:
             raise HTTPException(status_code=400, detail="Student ID required")
             
@@ -126,14 +134,16 @@ async def get_report_data(studentId: Optional[str] = None, current_user: dict = 
                 "course": r["courseName"]
             })
         return trend
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ACADEMIC] Exception in GET /report-data/: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/readiness/")
-async def get_student_readiness(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+def get_student_readiness(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
-        target_id = await get_target_student_id(current_user, studentId)
+        target_id = get_target_student_id(current_user, studentId)
         if not target_id:
             raise HTTPException(status_code=400, detail="Student ID required")
             
@@ -169,6 +179,8 @@ async def get_student_readiness(studentId: Optional[str] = None, current_user: d
             "benchmarks": benchmarks,
             "readinessScore": round(min(readiness, 100))
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ACADEMIC] Exception in GET /readiness/: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))

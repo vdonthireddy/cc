@@ -3,48 +3,55 @@ from ..database import execute_query, execute_commit
 from ..auth import get_current_user
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+import traceback
 
 router = APIRouter()
 
 class LORRequest(BaseModel):
-    studentId: int
     teacherName: str
-    teacherEmail: str
-    deadline: Optional[str] = None
+    subject: str
+    status: Optional[str] = "Requested"
+    studentId: Optional[int] = None
 
-@router.post("/request/")
-async def request_lor(req: LORRequest, current_user: dict = Depends(get_current_user)):
-    deadline_date = datetime.fromisoformat(req.deadline) if req.deadline else None
-    query = """
-        INSERT INTO RecommendationRequest (studentId, teacherName, teacherEmail, status, deadline)
-        VALUES (%s, %s, %s, 'requested', %s)
-    """
-    params = (req.studentId, req.teacherName, req.teacherEmail, deadline_date)
-    lor_id = execute_commit(query, params)
-    print(f"Mock email sent to {req.teacherEmail} for LoR request")
-    return {"id": lor_id, "status": "requested"}
+def get_target_student_id(user, requested_student_id):
+    if user["role"].upper() == "STUDENT":
+        student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
+        return student["id"] if student else None
+    if (user["role"].upper() in ["ADMIN", "COUNSELOR"]) and requested_student_id:
+        return int(requested_student_id)
+    return None
 
 @router.get("/")
-async def get_lors(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    user_id = current_user["id"]
-    user_role = current_user["role"].upper()
-    
-    query = "SELECT r.*, s.id as studentTableId, u.name as studentName FROM RecommendationRequest r JOIN Student s ON r.studentId = s.id JOIN User u ON s.userId = u.id"
-    params = []
-    
-    if user_role == "STUDENT":
-        student = execute_query("SELECT id FROM Student WHERE userId = %s", (user_id,), fetch_one=True)
-        if not student:
-            raise HTTPException(status_code=404, detail="Student not found")
-        query += " WHERE r.studentId = %s"
-        params.append(student["id"])
-    elif studentId:
-        query += " WHERE r.studentId = %s"
-        params.append(int(studentId))
-        
-    lors = execute_query(query, tuple(params))
-    # Nest student data for frontend compatibility
-    for lor in lors:
-        lor["student"] = {"user": {"name": lor["studentName"]}}
-    return lors
+def get_lors(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    try:
+        target_id = get_target_student_id(current_user, studentId)
+        if not target_id:
+            raise HTTPException(status_code=400, detail="Student ID required")
+            
+        lors = execute_query("SELECT * FROM LORRequest WHERE studentId = %s ORDER BY createdAt DESC", (target_id,))
+        return lors
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[LOR] Exception in GET /: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/")
+def add_lor(lor: LORRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        target_id = get_target_student_id(current_user, lor.studentId)
+        if not target_id:
+            raise HTTPException(status_code=400, detail="Student ID required")
+            
+        query = """
+            INSERT INTO LORRequest (studentId, teacherName, subject, status)
+            VALUES (%s, %s, %s, %s)
+        """
+        params = (target_id, lor.teacherName, lor.subject, lor.status)
+        lor_id = execute_commit(query, params)
+        return {"id": lor_id, **lor.dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[LOR] Exception in POST /: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))

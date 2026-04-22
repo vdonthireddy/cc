@@ -4,6 +4,7 @@ from .database import execute_query
 from .auth import create_access_token, verify_password, get_current_user
 from .routers import counselor, academic, admin, ec, lor, roadmap, scholarships, parent
 import os
+import traceback
 
 app = FastAPI(title="Pathfinder API", version="0.1.0")
 
@@ -16,93 +17,82 @@ app.add_middleware(
     expose_headers=["set-cookie"]
 )
 
-# Authentication Router
+# Simplified Login using standard FastAPI patterns
+from pydantic import BaseModel
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 @app.post("/api/auth/login")
-async def login(request: Request, response: Response):
-    body = await request.json()
-    email = body.get("email")
-    password = body.get("password")
-    
-    user = execute_query("SELECT * FROM User WHERE email = %s", (email,), fetch_one=True)
-    if not user or not verify_password(password, user["passwordHash"]):
-        raise HTTPException(status_code=400, detail="Invalid email or password")
-        
-    access_token = create_access_token(data={"sub": str(user["id"])})
-    
-    # Set cookie for Lucia compatibility
-    response.set_cookie(
-        key="auth_session",
-        value=access_token,
-        httponly=True,
-        max_age=60*60*24,
-        samesite="lax"
-    )
-    
-    # Check if student
-    student_id = None
-    if user["role"].upper() == "STUDENT":
-        student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
-        if student:
-            student_id = student["id"]
+def login(data: LoginRequest, response: Response):
+    try:
+        user = execute_query("SELECT * FROM User WHERE email = %s", (data.email,), fetch_one=True)
+        if not user or not verify_password(data.password, user["passwordHash"]):
+            raise HTTPException(status_code=400, detail="Invalid email or password")
             
-    user_data = {
-        "id": user["id"],
-        "email": user["email"],
-        "name": user["name"],
-        "role": user["role"].upper(),
-    }
-    if student_id:
-        user_data["studentId"] = student_id
+        access_token = create_access_token(data={"sub": str(user["id"])})
         
-    return {"user": user_data}
+        response.set_cookie(
+            key="auth_session",
+            value=access_token,
+            httponly=True,
+            max_age=60*60*24,
+            samesite="lax"
+        )
+        
+        student_id = None
+        if user["role"].upper() == "STUDENT":
+            student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
+            if student:
+                student_id = student["id"]
+                
+        user_data = {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "role": user["role"].upper(),
+        }
+        if student_id:
+            user_data["studentId"] = student_id
+            
+        return {"user": user_data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[AUTH] Login Exception: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/auth/me")
-async def me(request: Request):
-    token = request.cookies.get("auth_session")
-    if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-            
-    if not token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-        
+def me(current_user: dict = Depends(get_current_user)):
     try:
-        from jose import jwt
-        from .auth import SECRET_KEY, ALGORITHM
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid session")
-        
-    user = execute_query("SELECT * FROM User WHERE id = %s", (user_id,), fetch_one=True)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-        
-    student_id = None
-    if user["role"].upper() == "STUDENT":
-        student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
-        if student:
-            student_id = student["id"]
+        user = current_user
+        student_id = None
+        if user["role"].upper() == "STUDENT":
+            student = execute_query("SELECT id FROM Student WHERE userId = %s", (user["id"],), fetch_one=True)
+            if student:
+                student_id = student["id"]
+                
+        user_data = {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "role": user["role"].upper(),
+        }
+        if student_id:
+            user_data["studentId"] = student_id
             
-    user_data = {
-        "id": user["id"],
-        "email": user["email"],
-        "name": user["name"],
-        "role": user["role"].upper(),
-    }
-    if student_id:
-        user_data["studentId"] = student_id
-        
-    return {"user": user_data}
+        return {"user": user_data}
+    except Exception as e:
+        print(f"[AUTH] Me Exception: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/logout")
-async def logout(response: Response):
+def logout(response: Response):
     response.delete_cookie("auth_session")
     return {"success": True}
 
 @app.get("/api/health")
-async def health():
+def health():
     return {"status": "ok"}
 
 # Include routers

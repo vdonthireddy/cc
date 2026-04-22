@@ -7,7 +7,7 @@ import traceback
 router = APIRouter()
 
 @router.get("/")
-async def get_roadmap(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+def get_roadmap(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user["id"]
         user_role = current_user["role"].upper()
