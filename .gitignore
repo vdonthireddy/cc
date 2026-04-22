@@ -1,17 +1,14 @@
 # Secrets
 .env
-api/.env
 web/.env
 *.pem
 
 # Dependencies
 node_modules/
-api/node_modules/
 web/node_modules/
 
 # Build artifacts
 dist/
-api/dist/
 web/dist/
 build/
 .vite/
