@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .database import execute_query
 from .auth import create_access_token, verify_password, get_current_user
-from .routers import counselor, academic, admin, ec, lor, roadmap, scholarships, parent
+from .routers import counselor, academic, admin, ec, lor, roadmap, scholarships, parent, documents
 import os
 import traceback
 
@@ -104,3 +104,4 @@ app.include_router(lor.router, prefix="/api/lor", tags=["lor"])
 app.include_router(roadmap.router, prefix="/api/roadmap", tags=["roadmap"])
 app.include_router(scholarships.router, prefix="/api/scholarships", tags=["scholarships"])
 app.include_router(parent.router, prefix="/api/parent", tags=["parent"])
+app.include_router(documents.router, prefix="/api/documents", tags=["documents"])

@@ -2,12 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Button, TextField, Checkbox, FormControlLabel,
-  Grid, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, MenuItem, CircularProgress, Alert
+  Grid, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, MenuItem, CircularProgress, Alert,
+  FormControl, InputLabel, Select
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PersonSearchIcon from '@mui/icons-material/PersonSearch';
 import { useAuthStore } from '../store/authStore';
 
 interface AcademicRecord {
@@ -24,6 +26,7 @@ interface AcademicRecord {
 const StudentAcademic = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   
   const studentIdParam = useMemo(() => {
@@ -44,6 +47,31 @@ const StudentAcademic = () => {
     isAP: false,
     isHonors: false
   });
+
+  const { data: students } = useQuery({
+    queryKey: ['academicStudents'],
+    queryFn: async () => {
+      if (!isStaff) return [];
+      const res = await axios.get('/api/counselor/students/');
+      return res.data;
+    },
+    enabled: isStaff,
+    retry: false
+  });
+
+  const handleStudentChange = (event: any) => {
+    const newId = event.target.value;
+    if (newId) {
+      navigate(`/academic?studentId=${newId}`);
+    } else {
+      navigate('/academic');
+    }
+  };
+
+  const selectedStudent = useMemo(() => {
+    if (!students || !studentIdParam) return null;
+    return students.find((s: any) => s.id.toString() === studentIdParam);
+  }, [students, studentIdParam]);
 
   const queryEnabled = !isStaff || !!studentIdParam;
 
@@ -124,8 +152,32 @@ const StudentAcademic = () => {
   return (
     <Box p={3}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-        Academic Tracker {studentIdParam ? `(Student ID: ${studentIdParam})` : ''}
+        Academic Tracker {selectedStudent ? `(${selectedStudent.name})` : (studentIdParam ? `(ID: ${studentIdParam})` : '')}
       </Typography>
+
+      {isStaff && (
+        <Paper sx={{ p: 3, mb: 4, borderLeft: '6px solid', borderColor: 'primary.main', boxShadow: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <PersonSearchIcon color="primary" />
+            <Typography variant="h6">Manage Tracker for Student</Typography>
+          </Box>
+          <FormControl fullWidth>
+            <InputLabel id="student-select-label">Student</InputLabel>
+            <Select
+              labelId="student-select-label"
+              id="student-select"
+              value={studentIdParam || ''}
+              label="Student"
+              onChange={handleStudentChange}
+            >
+              <MenuItem value=""><em>Select a student...</em></MenuItem>
+              {Array.isArray(students) && students.map((s: any) => (
+                <MenuItem key={s.id} value={s.id}>{s.name} (Grade {s.grade})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+      )}
 
       {!queryEnabled ? (
           <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>

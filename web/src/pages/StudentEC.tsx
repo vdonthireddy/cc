@@ -2,10 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { 
   Box, Typography, Paper, Grid, Card, CardContent, CardActions, 
   Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, 
-  IconButton, Chip, Tooltip, Alert, Snackbar, CircularProgress, Divider
+  IconButton, Chip, Tooltip, Alert, Snackbar, CircularProgress, Divider,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -14,6 +15,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import TimerIcon from '@mui/icons-material/Timer';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import StarIcon from '@mui/icons-material/Star';
+import PersonSearchIcon from '@mui/icons-material/PersonSearch';
 import { useAuthStore } from '../store/authStore';
 
 interface ECRecord {
@@ -28,6 +30,7 @@ interface ECRecord {
 const StudentEC = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
 
   const studentIdParam = useMemo(() => {
@@ -36,8 +39,34 @@ const StudentEC = () => {
   }, [location.search]);
 
   const userRole = user?.role?.toUpperCase();
-  const isStaffView = !!studentIdParam && (userRole === 'COUNSELOR' || userRole === 'ADMIN');
   const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
+
+  const { data: students } = useQuery({
+    queryKey: ['ecStudents'],
+    queryFn: async () => {
+      if (!isStaff) return [];
+      const res = await axios.get('/api/counselor/students/');
+      return res.data;
+    },
+    enabled: isStaff,
+    retry: false
+  });
+
+  const handleStudentChange = (event: any) => {
+    const newId = event.target.value;
+    if (newId) {
+      navigate(`/ec?studentId=${newId}`);
+    } else {
+      navigate('/ec');
+    }
+  };
+
+  const selectedStudent = useMemo(() => {
+    if (!students || !studentIdParam) return null;
+    return students.find((s: any) => s.id.toString() === studentIdParam);
+  }, [students, studentIdParam]);
+
+  const isStaffView = !!studentIdParam && isStaff;
 
   const [open, setOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -111,10 +140,10 @@ const StudentEC = () => {
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main', display: 'flex', alignItems: 'center', gap: 2 }}>
             <HistoryEduIcon fontSize="large" />
-            Extracurricular Logger
+            Extracurricular Logger {selectedStudent ? `(${selectedStudent.name})` : (studentIdParam ? `(ID: ${studentIdParam})` : '')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            {isStaffView ? `Reviewing records for Student ID: ${studentIdParam}` : "Build your profile by tracking your activities, roles, and impact."}
+            {isStaffView ? `Reviewing records for ${selectedStudent?.name || `Student ID: ${studentIdParam}`}` : "Build your profile by tracking your activities, roles, and impact."}
           </Typography>
         </Box>
         <Box display="flex" gap={2}>
@@ -123,7 +152,7 @@ const StudentEC = () => {
               variant="outlined" 
               startIcon={<SearchIcon />} 
               onClick={() => discoveryMutation.mutate()}
-              disabled={discoveryMutation.isLoading}
+              disabled={discoveryMutation.isPending}
             >
               Discover Clubs
             </Button>
@@ -139,6 +168,30 @@ const StudentEC = () => {
           </Button>
         </Box>
       </Box>
+
+      {isStaff && (
+        <Paper sx={{ p: 3, mb: 4, borderLeft: '6px solid', borderColor: 'primary.main', boxShadow: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <PersonSearchIcon color="primary" />
+            <Typography variant="h6">Manage Logger for Student</Typography>
+          </Box>
+          <FormControl fullWidth>
+            <InputLabel id="student-select-label">Student</InputLabel>
+            <Select
+              labelId="student-select-label"
+              id="student-select"
+              value={studentIdParam || ''}
+              label="Student"
+              onChange={handleStudentChange}
+            >
+              <MenuItem value=""><em>Select a student...</em></MenuItem>
+              {Array.isArray(students) && students.map((s: any) => (
+                <MenuItem key={s.id} value={s.id}>{s.name} (Grade {s.grade})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+      )}
 
       {!queryEnabled ? (
           <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'transparent', border: '2px dashed #e0e0e0' }}>
