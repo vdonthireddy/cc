@@ -5,47 +5,59 @@ AI-driven college counseling platform MVP for US high schools.
 ## Quick Start
 
 1. Ensure Docker is running.
-2. Run `./start.sh` to build and launch the stack.
+2. Run `./start.sh --demo` to build and launch the stack with a large-scale demo dataset.
 3. Access the application:
-   - Web: `http://localhost:3000`
-   - API: `http://localhost:4000`
-   - DB UI (Adminer): `http://localhost:8080`
+   - **Student Portal**: `http://localhost:3000/student-login`
+   - **Parent Portal**: `http://localhost:3000/parent-login`
+   - **Counselor Portal**: `http://localhost:3000/counselor-login`
+   - **Admin Portal**: `http://localhost:3000/admin-login`
+   - **DB UI (Adminer)**: `http://localhost:8080`
 
 ## Tech Stack
 - **Frontend**: React 18, Vite, TypeScript, MUI v5, Vega-Lite, TanStack Query, Zustand.
-- **Backend**: Node.js 20, Express, TypeScript, Prisma (MySQL), Lucia Auth.
-- **Agents**: BullMQ + Redis for background processing.
+- **Backend**: Python 3.11, FastAPI, Uvicorn, `mysql-connector-python` (Raw SQL).
+- **Database**: MySQL 8.0 (Schema managed via `schema.sql`).
+- **Proxy**: Nginx (Same-origin routing for secure cookie transmission).
+- **Auth**: JWT with HTTP-only cookies (`auth_session`).
 
-## FERPA/COPPA Compliance Checklist
+## Key Features
 
-- [x] **COPPA**: Blocking sign-up for students under 13.
-- [x] **FERPA**: `shareWithParents` toggle on `Student` model enforced in API middleware.
-- [x] **Data Encryption**: AES-256-GCM encryption for all sensitive API keys in the database.
-- [x] **Audit Logs**: All PII reads and admin configuration changes are logged to `audit_logs`.
-- [x] **No PII in Git**: `.gitignore` strictly enforced; `.env` never committed.
-- [x] **Session Management**: Secure cookies with Lucia Auth.
+### Role-Based Portals
+- **Admin**: Full system control, counselor & parent creation, active/inactive toggles, system-wide analytics.
+- **Counselor**: Manage assigned student cohorts, track application pipelines, identify at-risk students.
+- **Parent**: Multi-student association, view academic progress (GPA Trends), track upcoming college deadlines.
+- **Student**: Manage academic records, log extracurriculars, view personalized roadmaps and scholarship matches.
 
-## Testing
+### Analytics & Reporting
+- **Custom Visuals**: Powered by Vega-Lite for role-specific insights.
+- **Readiness Scoring**: Dynamic calculation based on GPA, weighted course load, and milestone completion.
+- **Standardized Routing**: Strict trailing-slash enforcement (`/api/resource/`) for reliable API interactions.
 
-### Backend Tests
-Ensure the API logic and RBAC are correct:
+## Environment Management
+
+### Initial Startup
 ```bash
-cd api
-npm test
+./start.sh --demo
 ```
 
-### Frontend Tests
-Verify UI components and rendering stability:
+### Full Rebuild
+Cleanup all volumes, prune images, and start fresh with large demo data:
 ```bash
-cd web
-npm test
+./rebuild.sh --demo
 ```
 
-## Enabling Agents
-Go to `/admin/settings` (as Admin) to toggle:
-- **Opportunity Scout**: Background web scraping for local clubs.
-- **Report Generator**: Automated PDF report generation with charts.
-- **GuardianAgent**: Always On (cannot be disabled).
+### Production Setup
+```bash
+./start.sh
+```
 
-## Cleanup
-Run `./cleanup.sh` to stop containers and prune volumes.
+## FERPA/COPPA Compliance
+
+- [x] **FERPA**: `shareWithParents` toggle enforced in SQL queries.
+- [x] **Data Integrity**: Raw SQL schema with foreign key constraints in `schema.sql`.
+- [x] **Secure Sessions**: HTTP-only JWT cookies with Nginx proxying for same-origin security.
+- [x] **Audit Ready**: All user actions are logged in the `AuditLog` table.
+
+## Maintenance
+- **Cleanup**: Run `./cleanup.sh` to stop containers and remove volumes.
+- **Schema Updates**: Modify `schema.sql` and run `./rebuild.sh --demo` to apply changes.
