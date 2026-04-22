@@ -9,6 +9,7 @@ router = APIRouter()
 async def get_roadmap(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     user_role = current_user["role"].upper()
+    print(f"[ROADMAP] User: {user_id}, Role: {user_role}, Requested studentId: {studentId}")
     
     target_student_id = None
     major_interest = "Other"
@@ -21,14 +22,21 @@ async def get_roadmap(studentId: Optional[str] = None, current_user: dict = Depe
             current_grade = student["grade"]
             major_interest = student["majorInterest"]
     elif (user_role in ["ADMIN", "COUNSELOR"]) and studentId:
-        target_student_id = int(studentId)
-        student = execute_query("SELECT grade, majorInterest FROM Student WHERE id = %s", (target_student_id,), fetch_one=True)
-        if student:
-            current_grade = student["grade"]
-            major_interest = student["majorInterest"]
+        try:
+            target_student_id = int(studentId)
+            student = execute_query("SELECT grade, majorInterest FROM Student WHERE id = %s", (target_student_id,), fetch_one=True)
+            if student:
+                current_grade = student["grade"]
+                major_interest = student["majorInterest"]
+            else:
+                print(f"[ROADMAP] Student with ID {target_student_id} not found in database.")
+                raise HTTPException(status_code=404, detail=f"Student with ID {target_student_id} not found")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid student ID format")
             
     if not target_student_id:
-        raise HTTPException(status_code=404, detail="Student not found")
+        print(f"[ROADMAP] No target_student_id resolved for user {user_id}")
+        raise HTTPException(status_code=400, detail="Student ID required")
         
     recommendations = []
     if major_interest == "CS" and current_grade == 10:

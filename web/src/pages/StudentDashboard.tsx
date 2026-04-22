@@ -11,7 +11,7 @@ const StudentDashboard: React.FC = () => {
   });
 
   const { data: gpaTrend, isLoading: trendLoading } = useQuery(['gpaTrend'], async () => {
-    const res = await axios.get('/api/academic/report-data');
+    const res = await axios.get('/api/academic/report-data/');
     return res.data;
   });
 

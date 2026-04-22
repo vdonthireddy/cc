@@ -39,6 +39,7 @@ async def get_target_student_id(user, requested_student_id):
 @router.get("/")
 async def get_academics(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     target_id = await get_target_student_id(current_user, studentId)
+    print(f"[ACADEMIC] User: {current_user['id']}, Role: {current_user['role']}, Target ID: {target_id}")
     if not target_id:
         raise HTTPException(status_code=400, detail="Student ID required")
     
@@ -59,7 +60,7 @@ async def add_academic(record: AcademicRecord, current_user: dict = Depends(get_
     record_id = execute_commit(query, params)
     return {"id": record_id, **record.dict()}
 
-@router.get("/gpa")
+@router.get("/gpa/")
 async def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     target_id = await get_target_student_id(current_user, studentId)
     if not target_id:
@@ -69,7 +70,7 @@ async def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(
     current_gpa = calculate_weighted_gpa(records)
     return {"currentGPA": current_gpa, "potentialGPA": current_gpa}
 
-@router.get("/report-data")
+@router.get("/report-data/")
 async def get_report_data(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     target_id = await get_target_student_id(current_user, studentId)
     if not target_id:
