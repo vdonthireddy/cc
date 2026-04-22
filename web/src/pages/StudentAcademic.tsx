@@ -38,14 +38,14 @@ const StudentAcademic = () => {
   });
 
   const { data: records, isLoading: recordsLoading } = useQuery(['academics', studentIdParam], async () => {
-    const url = `/api/academic/${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
+    const url = studentIdParam ? `/api/academic/?studentId=${studentIdParam}` : '/api/academic/';
     console.log('[ACADEMIC] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;
   });
 
   const { data: gpaData, isLoading: gpaLoading } = useQuery(['gpa', studentIdParam], async () => {
-    const url = `/api/academic/gpa/${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
+    const url = studentIdParam ? `/api/academic/gpa/?studentId=${studentIdParam}` : '/api/academic/gpa/';
     console.log('[GPA] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;

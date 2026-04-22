@@ -48,7 +48,7 @@ const Roadmap: React.FC = () => {
     queryFn: async () => {
       // If staff but no studentId, don't fetch yet
       if (isStaff && !studentId) return [];
-      const url = `/api/roadmap/${studentId ? `?studentId=${studentId}` : ''}`;
+      const url = studentId ? `/api/roadmap/?studentId=${studentId}` : '/api/roadmap/';
       const response = await axios.get(url);
       return response.data;
     },
