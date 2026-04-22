@@ -60,6 +60,21 @@ async def add_academic(record: AcademicRecord, current_user: dict = Depends(get_
     record_id = execute_commit(query, params)
     return {"id": record_id, **record.dict()}
 
+@router.delete("/{id}/")
+async def delete_academic(id: int, current_user: dict = Depends(get_current_user)):
+    target_id = await get_target_student_id(current_user, None)
+    
+    # Students can only delete their own records
+    if current_user["role"].upper() == "STUDENT":
+        if not target_id:
+            raise HTTPException(status_code=404, detail="Student not found")
+        record = execute_query("SELECT studentId FROM AcademicRecord WHERE id = %s", (id,), fetch_one=True)
+        if not record or record["studentId"] != target_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+            
+    execute_commit("DELETE FROM AcademicRecord WHERE id = %s", (id,))
+    return {"success": True}
+
 @router.get("/gpa/")
 async def get_gpa(studentId: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     target_id = await get_target_student_id(current_user, studentId)
