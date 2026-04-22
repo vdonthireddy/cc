@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Box, Typography, Paper, Grid, Card, CardContent, CardActions, 
   Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, 
@@ -29,8 +29,12 @@ const StudentEC = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { user } = useAuthStore();
-  const searchParams = new URLSearchParams(location.search);
-  const studentIdParam = searchParams.get('studentId');
+
+  const studentIdParam = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('studentId');
+  }, [location.search]);
+
   const isStaffView = !!studentIdParam && (user?.role === 'COUNSELOR' || user?.role === 'ADMIN');
 
   const [open, setOpen] = useState(false);
@@ -43,11 +47,11 @@ const StudentEC = () => {
     weeksPerYear: 0
   });
 
-  const { data: ecs, isLoading } = useQuery(['ecs', studentIdParam], async () => {
-    const url = `/api/ec/${studentIdParam ? `?studentId=${studentIdParam}` : ''}`;
+  const { data: ecs, isLoading, error } = useQuery(['ecs', studentIdParam], async () => {
+    const url = studentIdParam ? `/api/ec/?studentId=${studentIdParam}` : '/api/ec/';
     const res = await axios.get(url);
     return res.data;
-  });
+  }, { retry: false });
 
   const addMutation = useMutation((newEC: any) => 
     axios.post(`/api/ec/`, { ...newEC, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
@@ -83,9 +87,13 @@ const StudentEC = () => {
     addMutation.mutate(formData);
   };
 
-  const totalHours = Array.isArray(ecs) ? ecs.reduce((acc, curr) => acc + (curr.hoursPerWeek * curr.weeksPerYear), 0) : 0;
+  const totalHours = useMemo(() => {
+    return Array.isArray(ecs) ? ecs.reduce((acc, curr) => acc + (curr.hoursPerWeek * curr.weeksPerYear), 0) : 0;
+  }, [ecs]);
 
-  if (isLoading) return <Box display="flex" justifyContent="center" p={5}><CircularProgress /></Box>;
+  if (isLoading) return <Box display="flex" justifyContent="center" p={10}><CircularProgress size={60} /></Box>;
+
+  if (error) return <Box p={3}><Alert severity="error">Failed to load extracurricular activities.</Alert></Box>;
 
   return (
     <Box p={3} sx={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -124,7 +132,7 @@ const StudentEC = () => {
       {/* Summary Stats */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, bgcolor: 'primary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Paper sx={{ p: 2, bgcolor: 'primary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
             <StarIcon />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{Array.isArray(ecs) ? ecs.length : 0}</Typography>
@@ -133,7 +141,7 @@ const StudentEC = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, bgcolor: 'secondary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Paper sx={{ p: 2, bgcolor: 'secondary.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
             <TimerIcon />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{totalHours}</Typography>
@@ -142,7 +150,7 @@ const StudentEC = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, bgcolor: 'info.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Paper sx={{ p: 2, bgcolor: 'info.light', color: 'white', display: 'flex', alignItems: 'center', gap: 2, boxShadow: 3 }}>
             <EventAvailableIcon />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
@@ -159,7 +167,7 @@ const StudentEC = () => {
       <Grid container spacing={3}>
         {Array.isArray(ecs) && ecs.length > 0 ? ecs.map((ec: ECRecord) => (
           <Grid item xs={12} md={6} lg={4} key={ec.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
+            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
                   <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>{ec.name}</Typography>
@@ -182,7 +190,7 @@ const StudentEC = () => {
                   {ec.weeksPerYear} weeks per year
                 </Typography>
                 <Tooltip title="Delete Activity">
-                  <IconButton onClick={() => deleteMutation.mutate(ec.id)} color="error" size="small">
+                  <IconButton onClick={() => deleteMutation.mutate(ec.id)} color="error" size="small" disabled={deleteMutation.isLoading}>
                     <DeleteIcon />
                   </IconButton>
                 </Tooltip>
@@ -201,7 +209,6 @@ const StudentEC = () => {
         )}
       </Grid>
 
-      {/* Add Dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold' }}>Add New Extracurricular Activity</DialogTitle>
         <DialogContent dividers>
@@ -224,7 +231,6 @@ const StudentEC = () => {
               placeholder="What did you achieve? Who did you help? What were your responsibilities?"
               value={formData.impactDescription}
               onChange={(e) => setFormData({...formData, impactDescription: e.target.value})}
-              helperText={`${formData.impactDescription.length}/500 characters`}
             />
             <Grid container spacing={2}>
               <Grid item xs={6}>

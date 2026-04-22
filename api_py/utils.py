@@ -12,8 +12,7 @@ def calculate_weighted_gpa(records):
     total_credits = 0.0
     for r in records:
         base = grade_points.get(r.get("grade") or "", 0.0)
-        # Use .get() or index depending on if it's a dict or object
-        # In our case execute_query returns dicts
+        # Handle both camelCase and snake_case (depends on raw query vs prisma)
         is_ap = r.get("isAP") or r.get("is_ap") or False
         is_honors = r.get("isHonors") or r.get("is_honors") or False
         credits = r.get("credits") or 1.0

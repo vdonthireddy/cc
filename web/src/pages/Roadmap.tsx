@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -32,8 +32,12 @@ const Roadmap: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const searchParams = new URLSearchParams(location.search);
-  const studentId = searchParams.get('studentId');
+  
+  const studentId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('studentId');
+  }, [location.search]);
+
   const userRole = user?.role?.toUpperCase();
   const isStaff = userRole === 'COUNSELOR' || userRole === 'ADMIN';
 
@@ -41,18 +45,18 @@ const Roadmap: React.FC = () => {
     if (!isStaff) return [];
     const res = await axios.get('/api/counselor/students/');
     return res.data;
-  }, { enabled: isStaff });
+  }, { enabled: isStaff, retry: false });
 
   const { data: roadmap, isLoading, error } = useQuery<RoadmapYear[]>({
     queryKey: ['roadmap', studentId],
     queryFn: async () => {
-      // If staff but no studentId, don't fetch yet
       if (isStaff && !studentId) return [];
       const url = studentId ? `/api/roadmap/?studentId=${studentId}` : '/api/roadmap/';
       const response = await axios.get(url);
       return response.data;
     },
-    enabled: !isStaff || !!studentId
+    enabled: !isStaff || !!studentId,
+    retry: false
   });
 
   const handleStudentChange = (event: any) => {
@@ -66,8 +70,9 @@ const Roadmap: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 10 }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }} color="text.secondary">Loading roadmap...</Typography>
       </Box>
     );
   }
@@ -79,7 +84,7 @@ const Roadmap: React.FC = () => {
       </Typography>
       
       {isStaff && (
-        <Paper sx={{ p: 3, mb: 4, borderLeft: '6px solid', borderColor: 'primary.main' }}>
+        <Paper sx={{ p: 3, mb: 4, borderLeft: '6px solid', borderColor: 'primary.main', boxShadow: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <PersonSearchIcon color="primary" />
             <Typography variant="h6">Select Student to View Roadmap</Typography>
@@ -110,7 +115,7 @@ const Roadmap: React.FC = () => {
         </Alert>
       ) : isStaff && !studentId ? (
         <Box sx={{ textAlign: 'center', py: 8, opacity: 0.6 }}>
-          <SchoolIcon sx={{ fontSize: 60, mb: 2 }} color="disabled" />
+          <SchoolIcon sx={{ fontSize: 80, mb: 2, color: 'text.disabled' }} />
           <Typography variant="h6" color="text.secondary">Please select a student above to see their academic path.</Typography>
         </Box>
       ) : (
@@ -154,7 +159,7 @@ const Roadmap: React.FC = () => {
                   </Typography>
                 </Box>
 
-                <Card sx={{ flexGrow: 1, borderLeft: '4px solid', borderColor: 'secondary.main' }}>
+                <Card sx={{ flexGrow: 1, borderLeft: '4px solid', borderColor: 'secondary.main', transition: '0.3s', '&:hover': { boxShadow: 4 } }}>
                   <CardContent>
                     <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
                       Grade {item.year}

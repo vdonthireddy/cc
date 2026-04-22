@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Button, TextField, Checkbox, FormControlLabel,
-  Grid, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, MenuItem, CircularProgress
+  Grid, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, MenuItem, CircularProgress, Alert
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
@@ -23,8 +23,12 @@ interface AcademicRecord {
 const StudentAcademic = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const studentIdParam = searchParams.get('studentId');
+  
+  // Memoize search params to prevent unnecessary query triggers
+  const studentIdParam = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('studentId');
+  }, [location.search]);
 
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -37,19 +41,17 @@ const StudentAcademic = () => {
     isHonors: false
   });
 
-  const { data: records, isLoading: recordsLoading } = useQuery(['academics', studentIdParam], async () => {
+  const { data: records, isLoading: recordsLoading, error: recordsError } = useQuery(['academics', studentIdParam], async () => {
     const url = studentIdParam ? `/api/academic/?studentId=${studentIdParam}` : '/api/academic/';
-    console.log('[ACADEMIC] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;
-  });
+  }, { retry: false });
 
-  const { data: gpaData, isLoading: gpaLoading } = useQuery(['gpa', studentIdParam], async () => {
+  const { data: gpaData, isLoading: gpaLoading, error: gpaError } = useQuery(['gpa', studentIdParam], async () => {
     const url = studentIdParam ? `/api/academic/gpa/?studentId=${studentIdParam}` : '/api/academic/gpa/';
-    console.log('[GPA] Fetching from URL:', url);
     const res = await axios.get(url);
     return res.data;
-  });
+  }, { retry: false });
 
   const addMutation = useMutation((newRecord: any) => 
     axios.post(`/api/academic/`, { ...newRecord, studentId: studentIdParam ? parseInt(studentIdParam) : undefined }), {
@@ -79,13 +81,31 @@ const StudentAcademic = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.courseName) return;
     addMutation.mutate(formData);
   };
 
   const semesters = ['Fall', 'Spring', 'Summer', 'Winter'];
   const grades = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'];
 
-  if (recordsLoading || gpaLoading) return <Box display="flex" justifyContent="center" p={5}><CircularProgress /></Box>;
+  if (recordsLoading || gpaLoading) {
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" p={10}>
+        <CircularProgress size={60} thickness={4} />
+        <Typography sx={{ mt: 2 }} color="text.secondary">Loading academic records...</Typography>
+      </Box>
+    );
+  }
+
+  if (recordsError || gpaError) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">
+          Failed to load academic data. This might be due to a missing student profile or connection issue.
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box p={3}>
@@ -95,7 +115,7 @@ const StudentAcademic = () => {
       
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.main', color: 'white', borderRadius: 2 }}>
+          <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.main', color: 'white', borderRadius: 2, boxShadow: 4 }}>
             <Typography variant="h6" sx={{ opacity: 0.9 }}>Current Weighted GPA</Typography>
             <Typography variant="h2" sx={{ fontWeight: 'bold' }}>
                 {gpaData?.currentGPA ? Number(gpaData.currentGPA).toFixed(2) : '0.00'}
@@ -105,14 +125,14 @@ const StudentAcademic = () => {
       </Grid>
 
       <Box mb={3} display="flex" justifyContent="flex-end">
-        <Button variant="contained" size="large" onClick={() => setOpen(true)} startIcon={<span>+</span>}>
+        <Button variant="contained" size="large" onClick={() => setOpen(true)} startIcon={<span>+</span>} sx={{ px: 4 }}>
           Add Course
         </Button>
       </Box>
 
       <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
         <Table>
-          <TableHead sx={{ bgcolor: 'f5f5f5' }}>
+          <TableHead sx={{ bgcolor: '#f8f9fa' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Course</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Semester</TableCell>
@@ -141,14 +161,14 @@ const StudentAcademic = () => {
                   ) : 'Regular')}
                 </TableCell>
                 <TableCell align="right">
-                  <IconButton onClick={() => deleteMutation.mutate(row.id)} color="error" size="small">
+                  <IconButton onClick={() => deleteMutation.mutate(row.id)} color="error" size="small" disabled={deleteMutation.isLoading}>
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </TableCell>
               </TableRow>
             )) : (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">No academic records found. Start by adding your courses.</Typography>
                 </TableCell>
               </TableRow>
